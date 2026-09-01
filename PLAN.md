@@ -239,16 +239,16 @@ lookup, methods on the drawable, and one-call helpers. (Not bound to ArakneSwf's
 ```python
 import prespyc
 
-swf = prespyc.open("o2.swf")                # SwfFile
-variables = swf.variables                   # property — AS2 variable reading (Phase 3)
+swf = prespyc.open("o2.swf")  # SwfFile
+variables = swf.variables  # property — AS2 variable reading (Phase 3)
 
 ex = swf.extractor
-sprite = ex["1964"]                         # by exported name or character id
+sprite = ex["1964"]  # by exported name or character id
 timeline = ex.timeline
-for name, asset in ex.exported.items():     # dict of exported assets
+for name, asset in ex.exported.items():  # dict of exported assets
     ...
 
-webp_bytes = sprite.to_webp(frame=0, quality=90)   # render straight off the drawable
+webp_bytes = sprite.to_webp(frame=0, quality=90)  # render straight off the drawable
 
 # One-call export → writes export/1964.webp + export/1964.json (+ 1964-1.webp… multi-page)
 prespyc.export("o2.swf", "1964", out_dir="export/", zoom=2)
