@@ -416,3 +416,15 @@ for raw, tag in swf.tags(DefineShapeTag.TYPE_V1, DefineShape4Tag.TYPE_V4):
 ```
 
 With no arguments, every tag is yielded.
+
+## `Extractor.exported`
+
+`ExportAssetsTag.characters` and `SymbolClassTag.symbols` are **id → raw name** (`dict[int, bytes]`).
+`Extractor.exported` flips them into **name → id** (`dict[str, int]`):
+
+- decode the name with `decode_swf_text(raw, swf_version)` — the tag layer keeps `bytes`;
+- PHP's `$exported += array_flip(...)` keeps the **first** occurrence of a duplicate key, so use
+  `setdefault`, not `update`;
+- PHP coerces a numeric name like `"1681"` to the **int** key `1681`. The port keeps `str` keys.
+  `Extractor.__getitem__` accepts `int | str`, so the `int` branch (character id) must not shadow a
+  numeric exported name: look names up only for `str` keys.
