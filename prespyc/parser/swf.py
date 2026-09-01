@@ -11,7 +11,6 @@ from prespyc.parser.structure.raw_tag import RawTag
 from prespyc.parser.structure.record.rectangle import Rectangle
 
 
-
 class Swf:
     """A parsed SWF file. Tag *headers* are read eagerly, tag *bodies* on demand."""
 

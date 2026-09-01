@@ -36,8 +36,10 @@ Module file names are `snake_case` of the PHP class name: `DefineBitsJPEG3Tag.ph
 `define_bits_jpeg3.py`, `PlaceObject2Tag.php` → `place_object2.py`, `MorphShapeProcessor.php` →
 `morph_shape_processor.py`.
 
-Every package `__init__.py` re-exports its public names, so `from prespyc.parser.structure.tag
-import DefineShapeTag` works. Keep `__all__` sorted.
+Sub-package `__init__.py` files stay **empty**: import full module paths
+(`from prespyc.parser.structure.tag.define_shape import DefineShapeTag`). With ~180 modules,
+re-export shims buy little and invite import cycles. The only curated surface is the top-level
+`prespyc/__init__.py` (§7 of `PLAN.md`).
 
 ## 2. Naming
 
