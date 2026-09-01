@@ -438,11 +438,12 @@ as a constructor argument, so build against this surface and annotate it under `
 class Extractor:
     def __init__(self, file: SwfFile) -> None: ...
 
-    file: SwfFile                                     # the SWF being extracted
-    def error_enabled(self, error: int) -> bool: ...   # PHP errorEnabled()
-    def character(self, character_id: int) -> Drawable: ...   # MissingCharacter when absent
+    file: SwfFile  # the SWF being extracted
+
+    def error_enabled(self, error: int) -> bool: ...  # PHP errorEnabled()
+    def character(self, character_id: int) -> Drawable: ...  # MissingCharacter when absent
     def by_name(self, name: str) -> Drawable: ...
-    def __getitem__(self, key: int | str) -> Drawable: ...     # id, or exported name
+    def __getitem__(self, key: int | str) -> Drawable: ...  # id, or exported name
 
     @property
     def shapes(self) -> dict[int, ShapeDefinition]: ...
