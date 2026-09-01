@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import sys
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 __all__ = [
     "decode_swf_text",
+    "memory_total",
+    "memory_used",
     "num",
     "php_intdiv",
     "php_json_encode",
@@ -182,3 +186,26 @@ def xxh128(data: bytes | str) -> str:
         data = data.encode("utf-8")
 
     return xxhash.xxh128_hexdigest(data)
+
+
+def memory_used() -> int:
+    """Resident memory of the current process, in bytes."""
+    try:
+        with open("/proc/self/statm") as statm:
+            return int(statm.read().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+    except (OSError, IndexError, ValueError):
+        import resource
+
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
+
+
+def memory_total() -> int:
+    """
+    Total physical memory, in bytes.
+
+    Stands in for PHP's `memory_limit`, which has no Python equivalent.
+    """
+    try:
+        return os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+    except (OSError, ValueError):
+        return sys.maxsize
