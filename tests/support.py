@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import io
+import re
 import struct
 import tempfile
 import xml.etree.ElementTree as ET
@@ -26,21 +29,129 @@ def fixture(*parts: str) -> Path:
 # --------------------------------------------------------------------------------------- XML / SVG
 
 
+_DATA_URL = re.compile(r"^data:image/[a-z0-9.+-]+;base64,(.+)$", re.IGNORECASE | re.DOTALL)
+_IMAGE_ID = re.compile(r"image-([0-9a-f]{32})")
+_TRANSFORMED_PATTERN_ID = re.compile(r"^pattern-([CR]BN?)(\d+)-(\d+)-(\d+)$")
+
+
 def canonical_xml(text: str | bytes) -> str:
     """
     Normalize an XML document for comparison: attribute order, insignificant whitespace and
     namespace prefixes are ignored, text content is not.
 
-    This is the Python counterpart of PHPUnit's `assertXmlStringEqualsXmlString`.
+    This is the Python counterpart of PHPUnit's `assertXmlStringEqualsXmlString`, with one extra
+    step: **embedded raster images are compared by pixels, not by bytes.**
+
+    The goldens embed PNGs encoded by PHP's GD, and `prespyc` encodes with Pillow. No two PNG
+    encoders agree byte for byte, so three values derived from those bytes can never match: the
+    base64 payload, the `image-<md5 of the data url>` id, and — for a colour-transformed bitmap fill
+    — the `crc32(png)` segment of its `pattern-...` id. All three are replaced by a hash of the
+    *decoded* pixels, which is the fidelity requirement that actually matters.
+
+    Nothing else is relaxed. Geometry, transforms, the gradient content hashes and the rest of the
+    pattern id (repeat/smoothing flags, character id, matrix checksum) are compared verbatim.
     """
     if isinstance(text, str):
         text = text.encode("utf-8")
 
     root = ET.fromstring(text)
+    _normalize_images(root)
+
     out = io.StringIO()
     _write_canonical(root, out)
 
     return out.getvalue()
+
+
+def _normalize_images(root: ET.Element) -> None:
+    pixel_keys: dict[str, str] = {}
+
+    for element in root.iter():
+        for name, value in element.attrib.items():
+            match = _DATA_URL.match(value)
+
+            if match is None:
+                continue
+
+            key = _pixel_key(match.group(1))
+            pixel_keys[hashlib.md5(value.encode()).hexdigest()] = key
+            element.attrib[name] = f"data:image/pixels,{key}"
+
+    if not pixel_keys:
+        return
+
+    for element in root.iter():
+        for name, value in element.attrib.items():
+            element.attrib[name] = _IMAGE_ID.sub(lambda m: "image-" + pixel_keys.get(m.group(1), m.group(1)), value)
+
+    _normalize_transformed_patterns(root)
+
+
+def _normalize_transformed_patterns(root: ET.Element) -> None:
+    """
+    Rewrite the `crc32(png)` segment of a colour-transformed bitmap's `pattern-` id.
+
+    The pixel key of the pattern's own image replaces it, so two patterns over different images
+    still differ.
+    """
+    renamed: dict[str, str] = {}
+
+    for element in root.iter():
+        if not element.tag.endswith("pattern"):
+            continue
+
+        match = _TRANSFORMED_PATTERN_ID.match(element.attrib.get("id", ""))
+
+        if match is None:
+            continue
+
+        key = _pattern_image_key(element)
+
+        if key is None:
+            continue
+
+        old_id = element.attrib["id"]
+        new_id = f"pattern-{match.group(1)}{match.group(2)}-{key}-{match.group(4)}"
+        element.attrib["id"] = new_id
+        renamed[old_id] = new_id
+
+    if not renamed:
+        return
+
+    for element in root.iter():
+        for name, value in element.attrib.items():
+            for old_id, new_id in renamed.items():
+                if old_id in value:
+                    value = value.replace(old_id, new_id)
+                    element.attrib[name] = value
+
+
+def _pattern_image_key(pattern: ET.Element) -> str | None:
+    """The pixel key of the image a pattern draws, whether inlined or referenced."""
+    for child in pattern:
+        for name, value in child.attrib.items():
+            if not name.endswith("href"):
+                continue
+
+            if value.startswith("data:image/pixels,"):
+                return value.split(",", 1)[1]
+
+            if value.startswith("#image-"):
+                return value[len("#image-") :]
+
+    return None
+
+
+def _pixel_key(payload: str) -> str:
+    """A hash of the decoded RGBA pixels, so two encodings of the same image compare equal."""
+    from PIL import Image
+
+    blob = base64.b64decode(payload)
+
+    with Image.open(io.BytesIO(blob)) as image:
+        rgba = image.convert("RGBA")
+
+        return hashlib.sha1(f"{rgba.size}".encode() + rgba.tobytes()).hexdigest()
 
 
 def _write_canonical(element: ET.Element, out: io.StringIO) -> None:
