@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
-
 import pytest
 
 from prespyc.errors import Errors, ProcessingInvalidDataError
@@ -20,20 +18,6 @@ from prespyc.parser.structure.tag.place_object2 import PlaceObject2Tag
 from prespyc.parser.structure.tag.protect import ProtectTag
 from prespyc.parser.structure.tag.show_frame import ShowFrameTag
 from tests.support import SwfBuilder
-
-# `Extractor.character()` builds the image characters before anything else, so a character cannot
-# be resolved until they are ported.
-requires_characters = pytest.mark.skipif(
-    any(
-        importlib.util.find_spec(name) is None
-        for name in (
-            "prespyc.extractor.image.image_bits_definition",
-            "prespyc.extractor.image.jpeg_image_definition",
-            "prespyc.extractor.image.lossless_image_definition",
-        )
-    ),
-    reason="the image characters are not ported yet, so Extractor.character() cannot resolve anything",
-)
 
 # A 1x1 twip square outline, red, no fill.
 #   0b0001_0000 0b1000_1000                             - bounds [0-1]x[0-1]
@@ -61,7 +45,6 @@ def _sprite_swf(builder: SwfBuilder, sprite_tags, errors: int = Errors.ALL):
     )
 
 
-@requires_characters
 def test_unsupported_tag(swf_builder: SwfBuilder):
     swf = _sprite_swf(
         swf_builder,
@@ -82,7 +65,6 @@ def test_unsupported_tag(swf_builder: SwfBuilder):
         processor.process(sprite.tag.tags)
 
 
-@requires_characters
 def test_unsupported_tag_ignore_errors(swf_builder: SwfBuilder):
     swf = _sprite_swf(
         swf_builder,
@@ -136,7 +118,6 @@ def test_new_object_missing_character_id_ignore_error(swf_builder: SwfBuilder):
     assert len(timeline.frames[0].objects) == 0
 
 
-@requires_characters
 def test_missing_show_frame_tag(swf_builder: SwfBuilder):
     swf = _sprite_swf(
         swf_builder,
@@ -158,7 +139,6 @@ def test_missing_show_frame_tag(swf_builder: SwfBuilder):
         processor.process(sprite.tag.tags)
 
 
-@requires_characters
 def test_missing_show_frame_tag_ignore(swf_builder: SwfBuilder):
     swf = _sprite_swf(
         swf_builder,
@@ -177,7 +157,6 @@ def test_missing_show_frame_tag_ignore(swf_builder: SwfBuilder):
     assert processor.process(sprite.tag.tags) == Timeline.empty()
 
 
-@requires_characters
 def test_move_depth_not_exists(swf_builder: SwfBuilder):
     swf = _sprite_swf(
         swf_builder,
@@ -200,7 +179,6 @@ def test_move_depth_not_exists(swf_builder: SwfBuilder):
         processor.process(sprite.tag.tags)
 
 
-@requires_characters
 def test_move_depth_not_exists_ignore_error(swf_builder: SwfBuilder):
     swf = _sprite_swf(
         swf_builder,

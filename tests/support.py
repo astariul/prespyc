@@ -222,6 +222,50 @@ def image_diff(actual: bytes, expected: bytes, compare_size: bool = True) -> flo
     return sum(abs(x - y) for x, y in zip(pa, pb)) / (len(pa) * 255)
 
 
+def visible_image_diff(actual: bytes, expected: bytes) -> float:
+    """
+    Difference ratio between what the two images actually *show*.
+
+    `image_diff` compares raw RGBA, which counts the colour stored under fully transparent pixels —
+    undefined data that two encoders never agree on. This composites both over black and compares
+    the visible RGB, then the alpha, and returns the larger of the two means. Use it to compare
+    rasterizer output; use `image_diff` for pixel decoding, where raw equality is the point.
+    """
+    from PIL import Image, ImageChops
+
+    a = Image.open(io.BytesIO(actual)).convert("RGBA")
+    b = Image.open(io.BytesIO(expected)).convert("RGBA")
+
+    if a.size != b.size:
+        raise AssertionError(f"Image size differ. Expected: {b.size[0]}x{b.size[1]} Actual: {a.size[0]}x{a.size[1]}")
+
+    pixels = a.size[0] * a.size[1]
+
+    def composited(image):
+        return Image.alpha_composite(Image.new("RGBA", image.size, (0, 0, 0, 255)), image).convert("RGB")
+
+    rgb = ImageChops.difference(composited(a), composited(b)).convert("L")
+    rgb_mean = sum(i * count for i, count in enumerate(rgb.histogram())) / (pixels * 255)
+
+    alpha_a = a.getchannel("A").tobytes()
+    alpha_b = b.getchannel("A").tobytes()
+    alpha_mean = sum(abs(x - y) for x, y in zip(alpha_a, alpha_b)) / (pixels * 255)
+
+    return max(rgb_mean, alpha_mean)
+
+
+def assert_image_looks_like(actual: bytes, golden: Path | str, delta: float) -> None:
+    """Assert a rendered image looks like a golden, within a visible difference ratio."""
+    path = Path(golden)
+    assert path.exists(), f"missing golden: {path}"
+
+    diff = visible_image_diff(actual, path.read_bytes())
+
+    if diff > delta:
+        _save_failed(path.name, actual)
+        raise AssertionError(f"The images look different (visible diff ratio: {diff})")
+
+
 def assert_image_matches(actual: bytes, golden: Path | str, delta: float = 0.0) -> None:
     """Assert an encoded image matches a golden file, within a difference ratio."""
     path = Path(golden)

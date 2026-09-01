@@ -36,7 +36,7 @@ _PLACE_TAGS = (PlaceObjectTag, PlaceObject2Tag, PlaceObject3Tag)
 class TimelineProcessor:
     """Renders the frames of a timeline out of SWF display tags."""
 
-    MAX_BOUNDS: ClassVar[int] = 163_840
+    _MAX_BOUNDS: ClassVar[int] = 163_840
     """
     Maximum bounds size of a sprite, arbitrarily set to 8192 pixels.
 
@@ -166,15 +166,15 @@ class TimelineProcessor:
             objects_by_depth[frame_display_tag.depth] = object_properties
             current_object_bounds = object_properties.bounds
 
-            if current_object_bounds.width > self.MAX_BOUNDS or current_object_bounds.height > self.MAX_BOUNDS:
+            if current_object_bounds.width > self._MAX_BOUNDS or current_object_bounds.height > self._MAX_BOUNDS:
                 # Do not use this object for computing the sprite bounds
                 continue
 
             if not empty and (
-                current_object_bounds.xmax - xmin > self.MAX_BOUNDS
-                or current_object_bounds.ymax - ymin > self.MAX_BOUNDS
-                or xmax - current_object_bounds.xmin > self.MAX_BOUNDS
-                or ymax - current_object_bounds.ymin > self.MAX_BOUNDS
+                current_object_bounds.xmax - xmin > self._MAX_BOUNDS
+                or current_object_bounds.ymax - ymin > self._MAX_BOUNDS
+                or xmax - current_object_bounds.xmin > self._MAX_BOUNDS
+                or ymax - current_object_bounds.ymin > self._MAX_BOUNDS
             ):
                 # The placement of this object will result in a sprite that is too large,
                 # so we ignore it for computing the sprite bounds

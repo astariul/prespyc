@@ -2,28 +2,10 @@
 
 from __future__ import annotations
 
-import importlib.util
-
-import pytest
-
 from prespyc.extractor.extractor import Extractor
 from prespyc.extractor.modifier.base_character_modifier import BaseCharacterModifier
 from prespyc.swf_file import SwfFile
 from tests.support import fixture
-
-# `Extractor.character()` builds the image characters before anything else, so a character cannot
-# be resolved until they are ported.
-pytestmark = pytest.mark.skipif(
-    any(
-        importlib.util.find_spec(name) is None
-        for name in (
-            "prespyc.extractor.image.image_bits_definition",
-            "prespyc.extractor.image.jpeg_image_definition",
-            "prespyc.extractor.image.lossless_image_definition",
-        )
-    ),
-    reason="the image characters are not ported yet, so Extractor.character() cannot resolve anything",
-)
 
 
 def test_methods():

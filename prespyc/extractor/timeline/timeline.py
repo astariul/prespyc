@@ -55,8 +55,8 @@ class Timeline:
     def transform_colors(self, color_transform: ColorTransform) -> Timeline:
         frames = []
 
-        for object in self.frames:
-            frames.append(object.transform_colors(color_transform))
+        for frame in self.frames:
+            frames.append(frame.transform_colors(color_transform))
 
         return Timeline(self.bounds, *frames)
 

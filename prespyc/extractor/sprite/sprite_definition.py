@@ -42,7 +42,9 @@ class SpriteDefinition:
         if not self._timeline:
             if self._processing:
                 if self._processor is not None and self._processor.error_enabled(Errors.CIRCULAR_REFERENCE):
-                    raise CircularReferenceError(f"Circular reference detected while processing sprite {self.id}")
+                    raise CircularReferenceError(
+                        f"Circular reference detected while processing sprite {self.id}", self.id
+                    )
 
                 self._timeline = Timeline.empty()
 

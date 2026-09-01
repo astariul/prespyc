@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
-
 import pytest
 
 from prespyc.extractor.extractor import Extractor
@@ -15,20 +13,6 @@ from prespyc.parser.structure.record.matrix import Matrix
 from prespyc.parser.structure.record.rectangle import Rectangle
 from prespyc.swf_file import SwfFile
 from tests.support import assert_svg_matches, fixture
-
-# `Extractor.character()` builds the image characters before anything else, so no fixture can be
-# extracted until they are ported.
-pytestmark = pytest.mark.skipif(
-    any(
-        importlib.util.find_spec(name) is None
-        for name in (
-            "prespyc.extractor.image.image_bits_definition",
-            "prespyc.extractor.image.jpeg_image_definition",
-            "prespyc.extractor.image.lossless_image_definition",
-        )
-    ),
-    reason="the image characters are not ported yet, so Extractor.character() cannot resolve anything",
-)
 
 
 class _CountingModifier(BaseCharacterModifier):

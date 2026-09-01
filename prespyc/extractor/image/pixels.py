@@ -31,10 +31,10 @@ ALPHA_OPAQUE = 0
 ALPHA_TRANSPARENT = 127
 """GD alpha of a fully transparent pixel."""
 
-DEFAULT_JPEG_QUALITY = 75
+_DEFAULT_JPEG_QUALITY = 75
 """libjpeg's own default, which GD keeps when it is asked for quality -1."""
 
-DEFAULT_PNG_COMPRESSION = 6
+_DEFAULT_PNG_COMPRESSION = 6
 """zlib's own default, which GD keeps when it is asked for compression -1."""
 
 _PNG_ALPHA = bytes(255 - ((a << 1) + (a >> 6)) if a <= ALPHA_TRANSPARENT else 0 for a in range(256))
@@ -193,10 +193,6 @@ class Pixels:
 
         return pixels
 
-    @property
-    def is_true_color(self) -> bool:
-        return self._indices is None
-
     # ------------------------------------------------------------------------------------- palette
 
     def allocate_color(self, red: int, green: int, blue: int) -> int:
@@ -216,6 +212,7 @@ class Pixels:
     def write_indices(self, indices: bytes | bytearray) -> None:
         """Replace every pixel with a color table index, in row order."""
         assert self._indices is not None, "only a palette buffer is indexed"
+        assert len(indices) == self.width * self.height, "one index per pixel"
 
         self._indices = bytearray(indices)
 
@@ -315,7 +312,7 @@ class Pixels:
         image.save(
             buffer,
             "PNG",
-            compress_level=DEFAULT_PNG_COMPRESSION if compression < 0 else compression,
+            compress_level=_DEFAULT_PNG_COMPRESSION if compression < 0 else compression,
             **options,
         )
 
@@ -332,7 +329,7 @@ class Pixels:
         self._to_rgb_image().save(
             buffer,
             "JPEG",
-            quality=DEFAULT_JPEG_QUALITY if quality < 0 else quality,
+            quality=_DEFAULT_JPEG_QUALITY if quality < 0 else quality,
         )
 
         return buffer.getvalue()

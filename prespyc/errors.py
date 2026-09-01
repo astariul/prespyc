@@ -120,6 +120,11 @@ class ExtractorError(SwfError):
 class CircularReferenceError(ExtractorError):
     """A character references itself, directly or through its display list."""
 
+    def __init__(self, message: str, character_id: int) -> None:
+        super().__init__(message)
+        self.character_id = character_id
+        """Character id the cycle was detected on."""
+
 
 class ProcessingInvalidDataError(ExtractorError, ValueError):
     """

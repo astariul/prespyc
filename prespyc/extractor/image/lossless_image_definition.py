@@ -140,7 +140,9 @@ class LosslessImageDefinition:
 
         for y in range(height):
             offset = y * stride
-            indices[y * width : (y + 1) * width] = data[offset : offset + width]
+            # Padded so that truncated pixel data cannot resize the buffer: a short row falls back
+            # on the first color of the table, where the original would raise on the missing byte.
+            indices[y * width : (y + 1) * width] = data[offset : offset + width].ljust(width, b"\x00")
 
         pixels.write_indices(indices)
 

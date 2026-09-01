@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import importlib.util
-
 import pytest
 
 from prespyc.avm.processor import Processor
 from prespyc.avm.state import State
 from prespyc.extractor.drawer.svg.svg_canvas import SvgCanvas
 from prespyc.extractor.extractor import Extractor
+from prespyc.extractor.image.empty_image import EmptyImage
 from prespyc.extractor.modifier.base_character_modifier import BaseCharacterModifier
 from prespyc.extractor.sprite.sprite_definition import SpriteDefinition
 from prespyc.extractor.timeline.frame import Frame
@@ -21,25 +20,9 @@ from prespyc.parser.structure.record.rectangle import Rectangle
 from prespyc.swf_file import SwfFile
 from tests.support import assert_svg_matches, fixture
 
-# `Extractor.character()` builds the image characters before anything else, so no fixture can be
-# extracted until they are ported.
-pytestmark = pytest.mark.skipif(
-    any(
-        importlib.util.find_spec(name) is None
-        for name in (
-            "prespyc.extractor.image.empty_image",
-            "prespyc.extractor.image.image_bits_definition",
-            "prespyc.extractor.image.jpeg_image_definition",
-            "prespyc.extractor.image.lossless_image_definition",
-        )
-    ),
-    reason="the image characters are not ported yet, so Extractor.character() cannot resolve anything",
-)
-
 
 def _color_and_attach_modifier() -> BaseCharacterModifier:
     """The anonymous modifier of `FrameTest::modifyOneDepth()`: recolor, and attach a 1x1 image."""
-    from prespyc.extractor.image.empty_image import EmptyImage
 
     class Modifier(BaseCharacterModifier):
         def apply_on_frame(self, frame: Frame) -> Frame:
@@ -165,8 +148,6 @@ def test_object_by_name():
 
 
 def test_add_object_should_recompute_bounds():
-    from prespyc.extractor.image.empty_image import EmptyImage
-
     swf = SwfFile(fixture("extractor", "1047", "1047.swf"))
     extractor = Extractor(swf)
 
