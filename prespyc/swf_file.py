@@ -146,13 +146,21 @@ class SwfFile:
         """
         Global variables left by the `DoAction` tags.
 
-        Same caveat as `execute()`: only run this on a file you trust.
+        Same caveat as `execute()`: only run this on a file you trust. Use
+        `execute(state, processor).variables` when you need a custom state or a processor that
+        allows function calls.
         """
         return self.execute().variables
 
     @property
     def extractor(self) -> Extractor:
-        """The asset extractor for this file, created once and cached."""
+        """
+        The asset extractor for this file, created once and cached.
+
+        ArakneSwf builds a fresh extractor per call instead, to avoid retaining its caches. Here the
+        instance is shared, so repeated lookups reuse the processed characters; call
+        `extractor.release()` to free them.
+        """
         from prespyc.extractor.extractor import Extractor
 
         if self._extractor is None:
