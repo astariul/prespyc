@@ -368,3 +368,37 @@ Read [CONVENTIONS.md](CONVENTIONS.md) first — it holds the idiom, naming and f
 - **Dropped**: `src/Console/**`, the Imagick/Inkscape/native renderer backends, animated output and
   every output format except WEBP (and PNG/JPEG on the image characters, which the fixtures assert
   on directly).
+
+## Extractor contract (already written — build against it)
+
+These files fix the shared surface of the extractor layer. Do not change them; implement against them.
+
+| File | Holds |
+|---|---|
+| `prespyc/extractor/drawable.py` | `Drawable`, `RatioDrawable` protocols |
+| `prespyc/extractor/drawer/drawer.py` | `Drawer` protocol (the draw-ops sink) |
+| `prespyc/extractor/shape/path_drawer.py` | `PathDrawer` protocol |
+| `prespyc/extractor/image/image_character.py` | `ImageCharacter` protocol |
+| `prespyc/extractor/modifier/character_modifier.py` | `CharacterModifier` protocol |
+| `prespyc/extractor/timeline/blend_mode.py` | `BlendMode` |
+
+Accessor shapes (PHP method → Python), applied throughout the extractor:
+
+| PHP | Python |
+|---|---|
+| `bounds()` | `@property bounds` |
+| `shape()`, `timeline()`, `paths()`, `exported()`, `shapes()`, `sprites()`, `images()`, `morphShapes()` — no argument | `@property` (cached: compute once, store on the instance) |
+| `framesCount(bool $recursive = false)` | `frames_count(recursive=False)` |
+| `draw(DrawerInterface $d, int $frame = 0)` | `draw(drawer, frame=0)` |
+| `transformColors(ColorTransform $t)` | `transform_colors(color_transform)` |
+| `modify(CharacterModifierInterface $m, int $maxDepth = -1)` | `modify(modifier, max_depth=-1)` |
+| `withRatio(int $ratio)` | `with_ratio(ratio)` |
+| `toSvg(int $frame = 0, bool $subpixelStrokeWidth = true)` | `to_svg(frame=0, subpixel_stroke_width=True)` |
+| `toSvgAll(bool $subpixelStrokeWidth = true)` | `to_svg_all(subpixel_stroke_width=True)` — a generator |
+| `Extractor::character(int $id)` | `character(id)`, plus `__getitem__` accepting an `int` id or a `str` exported name |
+| `Extractor::byName(string $name)` | `by_name(name)` |
+| `Extractor::timeline(bool $useFileDisplayBounds = true)` | `timeline(use_file_display_bounds=True)` — takes an argument, so it stays a method |
+
+Where PHP memoises with `$this->x ??= ...`, use the same lazy pattern (a `_x` slot, or
+`functools.cached_property`). Tests assert identity (`assertSame($a->shape(), $a->shape())`), so the
+cache must return the *same* object.
