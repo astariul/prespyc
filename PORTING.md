@@ -275,7 +275,7 @@ Read [CONVENTIONS.md](CONVENTIONS.md) first — it holds the idiom, naming and f
 
 | PHP file | Python module | Python name | PHP LOC |
 |---|---|---|---|
-| `GD.php` | `prespyc/extractor/image/pixels.py` | `module-level functions` | 424 |
+| `GD.php` | `prespyc/extractor/image/pixels.py` | `Pixels` + module-level helpers | 424 |
 
 ## `src/Extractor/Sprite/`
 
@@ -334,9 +334,9 @@ Read [CONVENTIONS.md](CONVENTIONS.md) first — it holds the idiom, naming and f
 |---|---|---|---|
 | `AnimationFormater.php` | **dropped** (no animated output) | `--` | 62 |
 | `Converter.php` | `prespyc/extractor/drawer/converter.py` | `Converter` | 405 |
-| `DrawableFormater.php` | `prespyc/extractor/drawer/formater.py` | `DrawableFormater` | 61 |
+| `DrawableFormater.php` | **dropped** (it pairs a resizer with an output format; only WEBP is left) | `--` | 61 |
 | `FitSizeResizer.php` | `prespyc/extractor/drawer/resizer.py` | `FitSizeResizer` | 67 |
-| `ImageFormat.php` | `prespyc/extractor/drawer/converter.py` | `ImageFormat` | 80 |
+| `ImageFormat.php` | **dropped** (WEBP is the only output format) | `--` | 80 |
 | `ImageResizerInterface.php` | `prespyc/extractor/drawer/resizer.py` | `ImageResizer` | 39 |
 | `ScaleResizer.php` | `prespyc/extractor/drawer/resizer.py` | `ScaleResizer` | 46 |
 
