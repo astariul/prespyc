@@ -428,3 +428,36 @@ With no arguments, every tag is yielded.
 - PHP coerces a numeric name like `"1681"` to the **int** key `1681`. The port keeps `str` keys.
   `Extractor.__getitem__` accepts `int | str`, so the `int` branch (character id) must not shadow a
   numeric exported name: look names up only for `str` keys.
+
+## `Extractor` surface (write against it before it exists)
+
+`extractor.py` is ported last, because it depends on every definition class. The processors take it
+as a constructor argument, so build against this surface and annotate it under `if TYPE_CHECKING:`:
+
+```python
+class Extractor:
+    def __init__(self, file: SwfFile) -> None: ...
+
+    file: SwfFile                                     # the SWF being extracted
+    def error_enabled(self, error: int) -> bool: ...   # PHP errorEnabled()
+    def character(self, character_id: int) -> Drawable: ...   # MissingCharacter when absent
+    def by_name(self, name: str) -> Drawable: ...
+    def __getitem__(self, key: int | str) -> Drawable: ...     # id, or exported name
+
+    @property
+    def shapes(self) -> dict[int, ShapeDefinition]: ...
+    @property
+    def morph_shapes(self) -> dict[int, MorphShapeDefinition]: ...
+    @property
+    def sprites(self) -> dict[int, SpriteDefinition]: ...
+    @property
+    def images(self) -> dict[int, ImageCharacter]: ...
+    @property
+    def exported(self) -> dict[str, int]: ...
+
+    def timeline(self, use_file_display_bounds: bool = True) -> Timeline: ...
+    def release(self) -> None: ...
+    def release_if_out_of_memory(self, memory_limit: int | None = None) -> bool: ...
+```
+
+The processors only ever call `error_enabled()` and `character()`, plus read `file`.
