@@ -402,3 +402,17 @@ Accessor shapes (PHP method → Python), applied throughout the extractor:
 Where PHP memoises with `$this->x ??= ...`, use the same lazy pattern (a `_x` slot, or
 `functools.cached_property`). Tests assert identity (`assertSame($a->shape(), $a->shape())`), so the
 cache must return the *same* object.
+
+## `SwfFile.tags()`
+
+PHP yields a keyed generator (`yield $rawTag => $parsedTag`) and callers read either side. The port
+yields **pairs**:
+
+```python
+for raw, tag in swf.tags(DefineShapeTag.TYPE_V1, DefineShape4Tag.TYPE_V4):
+    if raw.id is None:
+        continue
+    shapes[raw.id] = ShapeDefinition(processor, raw.id, tag)
+```
+
+With no arguments, every tag is yielded.
