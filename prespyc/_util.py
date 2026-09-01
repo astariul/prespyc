@@ -8,17 +8,21 @@ like their Python spelling. Every arithmetic or formatting operation listed in `
 
 from __future__ import annotations
 
+import json
 import math
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
 __all__ = [
     "decode_swf_text",
     "num",
     "php_intdiv",
+    "php_json_encode",
     "php_mod",
     "php_round",
     "round_int",
     "to_int32",
+    "xxh128",
 ]
 
 
@@ -115,3 +119,66 @@ def decode_swf_text(raw: bytes, swf_version: int) -> str:
         return raw.decode("utf-8", errors="replace")
 
     return raw.decode("latin-1")
+
+
+def php_json_encode(value: Any) -> str:
+    r"""
+    Serialise a value exactly as PHP's `json_encode()` does.
+
+    Not interchangeable with `json.dumps`. The fill type ids that end up in SVG `id` attributes are
+    `xxh128(json_encode($fillType))`, so any difference in the JSON text changes the id and breaks
+    every gradient golden. Three PHP behaviours matter:
+
+    - no spaces between tokens;
+    - a float with no fractional part is written as an **integer** (`1.0` → `1`, `0.0` → `0`), since
+      `JSON_PRESERVE_ZERO_FRACTION` is off by default;
+    - `/` is escaped as `\/` and non-ASCII is escaped as `\uXXXX`.
+
+    Mapping keys are emitted in insertion order, so a dict standing in for a PHP object must declare
+    its keys in the same order as the PHP class declares its properties, with PHP's camelCase names.
+    """
+    if value is None:
+        return "null"
+
+    if value is True:
+        return "true"
+
+    if value is False:
+        return "false"
+
+    if isinstance(value, int):
+        return str(value)
+
+    if isinstance(value, float):
+        return _php_json_float(value)
+
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=True).replace("/", "\\/")
+
+    if isinstance(value, dict):
+        return "{" + ",".join(f"{php_json_encode(str(k))}:{php_json_encode(v)}" for k, v in value.items()) + "}"
+
+    if isinstance(value, (list, tuple)):
+        return "[" + ",".join(php_json_encode(item) for item in value) + "]"
+
+    raise TypeError(f"Cannot JSON encode {type(value).__name__}")
+
+
+def _php_json_float(value: float) -> str:
+    if value == 0.0:
+        return "-0" if math.copysign(1.0, value) < 0 else "0"
+
+    if value.is_integer() and abs(value) < 1e15:
+        return str(int(value))
+
+    return repr(value)
+
+
+def xxh128(data: bytes | str) -> str:
+    """PHP `hash('xxh128', ...)`: the 128 bit XXH3 digest, as lowercase hex."""
+    import xxhash
+
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+
+    return xxhash.xxh128_hexdigest(data)

@@ -107,6 +107,20 @@ PHP semantics that differ from Python and **change golden output**. Always use t
 `num()` is mandatory for every number written into SVG output. `"1.0"` where PHP wrote `"1"` is a
 golden failure.
 
+**Hashing.** The fill type ids that land in SVG `id`/`href` attributes are content hashes, so they
+are part of the golden output:
+
+| PHP | Python |
+|---|---|
+| `hash('xxh128', json_encode($this))` | `xxh128(php_json_encode(...))` from `prespyc._util` |
+| `json_encode($object)` | `php_json_encode({...})` — **not** `json.dumps`: PHP writes an integral float as an integer (`1.0` → `1`), uses no spaces, and escapes `/` |
+| `md5($string)` | `hashlib.md5(...).hexdigest()` |
+| `crc32($string)` | `zlib.crc32(...)` (both unsigned) |
+
+A dict standing in for a PHP object must list its keys in the order the PHP class declares its
+properties, with PHP's camelCase names (`scaleX`, `rotateSkew0`, `spreadMode`, …). `tests/test_util.py`
+pins the whole chain against a real golden id.
+
 Integer width: PHP is 64-bit and wraps nothing in practice here; Python ints are unbounded. Where
 the PHP code relies on 32-bit wrap (AVM bitwise ops), mask explicitly — `to_int32()` in
 `prespyc._util`.

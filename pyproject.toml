@@ -10,6 +10,7 @@ keywords = ["swf", "flash", "svg", "webp", "spritesheet"]
 dependencies = [
     "pillow>=11",
     "resvg-py>=0.5",
+    "xxhash>=4.0.1",
 ]
 
 [project.urls]
