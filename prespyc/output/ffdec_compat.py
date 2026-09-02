@@ -1,10 +1,12 @@
 """
-Drop-in replacement for noxine's `scripts/ffdec.py`.
+Compatibility shim for pipelines built around ffdec (JPEXS Free Flash Decompiler).
 
-Mirrors `ffdec_export()`'s signature and on-disk layout, so the import can be swapped and the Java
-dependency dropped without touching the callers. Frames are written as PNG, because that is what
-ffdec wrote and what noxine's atlas packer reads; the native path is
-`prespyc.export()`, which writes WEBP directly.
+`ffdec_export()` mirrors the arguments and the on-disk layout of ffdec's `-export` command, so a
+caller can swap the import and drop the Java dependency without changing anything else. Frames are
+written as PNG, because that is what ffdec wrote.
+
+This exists for migration only. The native path is `prespyc.export()`, which writes WEBP and its
+JSON directly.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
     from prespyc.extractor.drawable import Drawable
 
 ZOOM = 2
-"""Render scale, matching noxine's `ffdec.ZOOM`."""
+"""Render scale of the shim, matching the `-zoom 2` that ffdec pipelines typically passed."""
 
 
 def ffdec_export(
@@ -38,8 +40,7 @@ def ffdec_export(
 
     `export_type` accepts `"sprite"` and `"shape"`. Each character goes to
     `{out_folder}/DefineSprite_{id}_{exported name}/{frame + 1}.png` (the name part is omitted when
-    the character is not exported), which is the layout ffdec produces and noxine's spritesheet
-    builder reads.
+    the character is not exported), which is the layout ffdec produces.
 
     `chids` restricts the export to those character ids. `frame_idx` renders one frame only, and
     `subframes` splits that frame into that many sub-steps, as ffdec's `-sublength` does.

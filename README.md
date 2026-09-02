@@ -4,9 +4,8 @@ SWF parsing and resource extraction, in pure Python.
 
 `prespyc` reads Adobe Flash `.swf` files and turns their assets into **WEBP spritesheets with
 PixiJS-compatible JSON** — no Java, no ImageMagick, no external binary. It is a Python port of
-[ArakneSwf](https://github.com/Arakne/ArakneSwf), and exists to replace
-[ffdec](https://github.com/jindrapetrik/jpexs-decompiler) in
-[noxine](https://github.com/astariul/noxine)'s asset pipeline.
+[ArakneSwf](https://github.com/Arakne/ArakneSwf), and is meant to take the place of
+[ffdec](https://github.com/jindrapetrik/jpexs-decompiler) in an asset build.
 
 ## Status
 
@@ -44,7 +43,7 @@ from prespyc.extractor.drawer.resizer import FitSizeResizer
 webp = Converter(FitSizeResizer(128, 128)).to_webp(sprite, frame=5, lossless=True)
 ```
 
-Replacing noxine's ffdec calls, keeping ffdec's on-disk layout:
+Replacing ffdec calls, keeping ffdec's on-disk layout:
 
 ```python
 from prespyc.output.ffdec_compat import ffdec_export

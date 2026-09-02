@@ -65,14 +65,14 @@ paths = prespyc.export("1047.swf", "anim0R", "out/", zoom=2)
 - `max_size` — page limit in pixels. Frames that do not fit spill into `{name}-1`, `{name}-2`, …,
   linked from `meta.related_multi_packs` on the main page. Frame indices stay global across pages.
 
-The JSON is noxine's schema, so PixiJS consumes it directly:
+The JSON is a PixiJS-compatible spritesheet, so a client consumes it directly:
 
 ```jsonc
 {
   "frames": { "0": { "frame": {"x":0,"y":0,"w":40,"h":42}, "rotated": false, "trimmed": false,
                      "spriteSourceSize": {...}, "sourceSize": {...},
                      "anchor": {"x":0.42,"y":0.91} } },
-  "meta": { "app": "noxine", "image": "anim0R.webp", "format": "RGBA8888",
+  "meta": { "app": "prespyc", "image": "anim0R.webp", "format": "RGBA8888",
             "size": {"w":..,"h":..}, "scale": 2, "related_multi_packs": ["anim0R-1.json"] },
   "flash_frames": [{"frames": [0, 1, 2]}],
   "animations": {}

@@ -1,5 +1,5 @@
 """
-Phase 6 gate: real Dofus SWFs render to WEBP + JSON that matches noxine's schema.
+Phase 6 gate: real Dofus SWFs render to WEBP + PixiJS-compatible JSON.
 
 `tests/fixtures/extractor/` holds genuine Dofus Retro gfx files (1047, 1305, 1435, 1601, 1597,
 1700, o3, 7022), so these exercise the whole parse → extract → SVG → raster → atlas chain.
@@ -18,13 +18,13 @@ from prespyc.output.exporter import build_spritesheet
 from tests.support import fixture
 
 
-def assert_matches_noxine_schema(data: dict, page_name: str, zoom: float, main_page: bool) -> None:
-    """The schema noxine's `SpriteLoader` consumes. Keep in sync with `scripts/spritesheet.py`."""
+def assert_matches_schema(data: dict, page_name: str, zoom: float, main_page: bool) -> None:
+    """The spritesheet JSON schema a PixiJS client consumes. Keep in sync with `output/spritesheet.py`."""
     assert set(data) <= {"frames", "meta", "flash_frames", "animations"}
     assert set(data) >= {"frames", "meta"}
 
     meta = data["meta"]
-    assert meta["app"] == "noxine"
+    assert meta["app"] == "prespyc"
     assert meta["image"] == f"{page_name}.webp"
     assert meta["format"] == "RGBA8888"
     assert meta["scale"] == zoom
@@ -59,7 +59,7 @@ def test_export_a_dofus_sprite_by_name(tmp_path):
     assert [path.name for path in written] == ["anim0R.webp", "anim0R.json"]
 
     data = json.loads((tmp_path / "anim0R.json").read_text())
-    assert_matches_noxine_schema(data, "anim0R", zoom=2, main_page=True)
+    assert_matches_schema(data, "anim0R", zoom=2, main_page=True)
 
     # anim0R has one frame of its own but 40 through its children, which is what animates
     assert len(data["frames"]) == 40
@@ -74,7 +74,7 @@ def test_export_by_character_id(tmp_path):
     written = prespyc.export(fixture("extractor", "1047", "1047.swf"), 65, tmp_path, name="65")
 
     assert [path.name for path in written] == ["65.webp", "65.json"]
-    assert_matches_noxine_schema(json.loads((tmp_path / "65.json").read_text()), "65", zoom=1.0, main_page=True)
+    assert_matches_schema(json.loads((tmp_path / "65.json").read_text()), "65", zoom=1.0, main_page=True)
 
 
 def test_zoom_scales_the_frames(tmp_path):
@@ -120,7 +120,7 @@ def test_export_real_dofus_gfx(swf, selector, tmp_path):
     written = prespyc.export(fixture("extractor", *swf), selector, tmp_path, zoom=2, name="out")
 
     data = json.loads((tmp_path / "out.json").read_text())
-    assert_matches_noxine_schema(data, "out", zoom=2, main_page=True)
+    assert_matches_schema(data, "out", zoom=2, main_page=True)
 
     for path in written:
         assert path.stat().st_size > 0
@@ -143,14 +143,14 @@ def test_multi_page_export_links_the_pages(tmp_path):
 
     main = json.loads((tmp_path / "anim0R.json").read_text())
     assert main["meta"]["related_multi_packs"]
-    assert_matches_noxine_schema(main, "anim0R", zoom=2, main_page=True)
+    assert_matches_schema(main, "anim0R", zoom=2, main_page=True)
 
     seen = set(main["frames"])
 
     for related in main["meta"]["related_multi_packs"]:
         page_name = related.removesuffix(".json")
         data = json.loads((tmp_path / related).read_text())
-        assert_matches_noxine_schema(data, page_name, zoom=2, main_page=False)
+        assert_matches_schema(data, page_name, zoom=2, main_page=False)
         assert not seen & set(data["frames"]), "a frame must live on exactly one page"
         seen |= set(data["frames"])
 

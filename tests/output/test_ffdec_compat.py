@@ -1,8 +1,8 @@
 """
 Phase 7 gate: a sprite comes out through the ffdec shim, in ffdec's on-disk layout.
 
-noxine's `scripts/extract_maps_spritesheets.py` reads
-`{out}/DefineSprite_{chid}_{expid}/{frame + 1}.png`, so that layout is the contract.
+A caller migrating off ffdec reads `{out}/DefineSprite_{id}_{name}/{frame + 1}.png`, so that layout
+is the contract.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from prespyc.output.ffdec_compat import ZOOM, ffdec_export
 from tests.support import fixture
 
 
-def test_zoom_matches_noxine():
+def test_zoom_default():
     assert ZOOM == 2
 
 

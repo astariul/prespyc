@@ -1,8 +1,9 @@
 """
 Atlas packing: sprite frames to WEBP pages plus PixiJS-compatible JSON.
 
-Port of noxine's `scripts/spritesheet.py`, emitting WEBP instead of PNG. The JSON schema is
-unchanged, so PixiJS consumption is identical.
+The JSON follows the TexturePacker-style layout PixiJS reads, with two additions a Flash asset
+needs: `frames[i].anchor`, the sprite origin as a fraction of the frame, and `flash_frames`, the
+playback order of the rendered frames.
 """
 
 from __future__ import annotations
@@ -132,7 +133,7 @@ class Spritesheet:
             page_data: dict = {
                 "frames": frames_data,
                 "meta": {
-                    "app": "noxine",
+                    "app": "prespyc",
                     "image": f"{page_name}.webp",
                     "format": "RGBA8888",
                     "size": {"w": page_image.width, "h": page_image.height},
