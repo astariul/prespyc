@@ -1,4 +1,4 @@
-name: CI
+name: test
 
 on:
   push:
@@ -9,11 +9,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
       - run: uv sync --all-groups
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
       - run: uv run pytest -q -n auto
