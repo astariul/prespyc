@@ -7,6 +7,11 @@ on:
 jobs:
   pypi:
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/prespyc
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -17,6 +22,4 @@ jobs:
       - name: Build package distribution
         run: uv build
       - name: Publish to PyPI
-        run: uv publish
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv publish --trusted-publishing always
