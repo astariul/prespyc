@@ -2,10 +2,11 @@
 
 `prespyc` is a pure-Python SWF reader and resource extractor.
 
-It stands on the shoulder of giants : it's a direct port of
+> [!NOTE]
+> `prespyc` stands on the shoulder of giants : it's a direct port of
 [ArakneSwf](https://github.com/Arakne/ArakneSwf).
 
-It parses `.swf`, renders sprites through an SVG engine, rasterizes them and writes WEBP atlas pages plus JSON files, directly readable in PixiJS for example.
+`prespyc` parses `.swf`, renders sprites through an SVG engine, rasterizes them and writes WEBP atlas pages plus JSON files, directly readable in `PixiJS` for example.
 
 ---
 
