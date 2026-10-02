@@ -3,8 +3,6 @@
 File-by-file map from ArakneSwf (PHP) to `prespyc` (Python). This is the contract the port follows:
 module paths and class names are fixed here so that work on different subsystems stays consistent.
 
-Read [CONVENTIONS.md](CONVENTIONS.md) first — it holds the idiom, naming and fidelity rules.
-
 `src/Console/**` (~720 LOC) is dropped: `prespyc` is a library, not a CLI.
 
 

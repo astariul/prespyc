@@ -2,8 +2,7 @@
 PHP semantics helpers.
 
 The port must reproduce ArakneSwf's output byte for byte, and a few PHP operations do not behave
-like their Python spelling. Every arithmetic or formatting operation listed in `CONVENTIONS.md`
-§4 must go through this module.
+like their Python spelling. Such operations must go through this module.
 """
 
 from __future__ import annotations
