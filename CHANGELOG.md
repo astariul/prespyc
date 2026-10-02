@@ -10,6 +10,7 @@
 * ⭐ `Substitute` modifier: swap characters by id through the tree
 * ⭐ `Matrix @ Matrix`: composition
 * ⭐ `ShapeBuilder`: draw a shape character from scratch
+* ⭐ `RenderedFrames` and `Spritesheet.pages()`: pack a page at a time, in bounded memory
 * 🪲 Drop gradient stops whose ratio does not exceed the previous one
 
 

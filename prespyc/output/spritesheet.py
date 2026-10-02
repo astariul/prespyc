@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
     from PIL import Image
 
 MAX_ATLAS_SIZE = 8192
@@ -56,6 +59,52 @@ def plan_pages(sizes: list[tuple[int, int]], margin: int, max_size: int) -> tupl
     return cols, pages
 
 
+class RenderedFrames(Sequence["Image.Image"]):
+    """
+    Frames drawn when they are read, by `render(index)`.
+
+    A sheet of rendered frames is packed a page at a time, so a sprite of any length fits in memory.
+    Every frame must come out the size of the first one, as rendering a drawable on its own bounds
+    does.
+    """
+
+    __slots__ = ("_count", "_first", "_render")
+
+    def __init__(self, render: Callable[[int], Image.Image], count: int) -> None:
+        self._render = render
+        self._count = count
+        self._first: Image.Image | None = None
+        """The first frame, rendered for its size and kept until it is read."""
+
+    @property
+    def size(self) -> tuple[int, int]:
+        """`(width, height)` of every frame."""
+        if self._first is None:
+            self._first = self._render(0)
+
+        return self._first.size
+
+    def __len__(self) -> int:
+        return self._count
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return [self[i] for i in range(*index.indices(self._count))]
+
+        if index < 0:
+            index += self._count
+
+        if not 0 <= index < self._count:
+            raise IndexError(index)
+
+        if index == 0 and self._first is not None:
+            first, self._first = self._first, None
+
+            return first
+
+        return self._render(index)
+
+
 @dataclass(frozen=True, slots=True)
 class Page:
     """One atlas page: a WEBP image and its JSON descriptor."""
@@ -90,7 +139,9 @@ class Spritesheet:
     name: str
     """Base name of the pages, i.e. the exported id."""
 
-    frames: list[Image.Image] = field(default_factory=list)
+    frames: Sequence[Image.Image] = field(default_factory=list)
+    """The frames, in order: a list, or `RenderedFrames` to draw them only when their page is packed."""
+
     bounds: tuple[float, float, float, float] = (0, 0, 0, 0)
     """`(xmin, ymin, xmax, ymax)` of the sprite, in output pixels."""
 
@@ -108,9 +159,17 @@ class Spritesheet:
         `{name}-2`, …, hold only their frames. Frame indices stay global across pages, so
         `flash_frames`/`animations` keep referencing them unchanged.
         """
+        return list(self.pages(margin, max_size))
+
+    def pages(self, margin: int = 1, max_size: int = MAX_ATLAS_SIZE) -> Iterator[Page]:
+        """The pages of `pack()`, packed one at a time."""
         from PIL import Image
 
-        sizes = [(image.width, image.height) for image in self.frames]
+        if isinstance(self.frames, RenderedFrames):
+            sizes = [self.frames.size] * len(self.frames)
+        else:
+            sizes = [(image.width, image.height) for image in self.frames]
+
         cols, pages = plan_pages(sizes, margin, max_size)
         n_pages = len(pages)
 
@@ -124,10 +183,8 @@ class Spritesheet:
             "y": -ymin / orig_h if orig_h > 0 else 0,
         }
 
-        result: list[Page] = []
-
         for page_idx, frame_indices in enumerate(pages):
-            page_image, frames_data = self._render_page(Image, frame_indices, cols, margin, anchor)
+            page_image, frames_data = self._render_page(Image, frame_indices, sizes, cols, margin, anchor)
 
             page_name = self.name if page_idx == 0 else f"{self.name}-{page_idx}"
             page_data: dict = {
@@ -151,9 +208,7 @@ class Spritesheet:
                 if self.animations:
                     page_data["animations"] = self.animations
 
-            result.append(Page(page_name, page_image, page_data))
-
-        return result
+            yield Page(page_name, page_image, page_data)
 
     def write(
         self,
@@ -166,12 +221,22 @@ class Spritesheet:
         """Pack and write every page into `out_dir`. Returns every written path."""
         written: list[Path] = []
 
-        for page in self.pack(margin, max_size):
+        for page in self.pages(margin, max_size):
             written.extend(page.write(out_dir, quality, lossless))
+            # Let the page go before the next one is drawn: a page can weigh hundreds of MB.
+            del page
 
         return written
 
-    def _render_page(self, image_module, frame_indices: list[int], cols: int, margin: int, anchor: dict):
+    def _render_page(
+        self,
+        image_module,
+        frame_indices: list[int],
+        sizes: list[tuple[int, int]],
+        cols: int,
+        margin: int,
+        anchor: dict,
+    ):
         # Precise grid layout: each column is as wide as its widest frame, each row as tall as its
         # tallest frame.
         rows = math.ceil(len(frame_indices) / cols) if frame_indices else 1
@@ -179,9 +244,9 @@ class Spritesheet:
         row_heights = [0] * rows
 
         for local_i, gi in enumerate(frame_indices):
-            image = self.frames[gi]
-            col_widths[local_i % cols] = max(col_widths[local_i % cols], image.width + margin)
-            row_heights[local_i // cols] = max(row_heights[local_i // cols], image.height + margin)
+            width, height = sizes[gi]
+            col_widths[local_i % cols] = max(col_widths[local_i % cols], width + margin)
+            row_heights[local_i // cols] = max(row_heights[local_i // cols], height + margin)
 
         page_image = image_module.new("RGBA", (sum(col_widths) or 1, sum(row_heights) or 1), (0, 0, 0, 0))
         frames_data = {}
@@ -193,6 +258,13 @@ class Spritesheet:
             y = sum(row_heights[:row])
 
             image = self.frames[gi]
+
+            if image.size != sizes[gi]:
+                raise ValueError(
+                    f"Frame {gi} is {image.width}x{image.height}, expected {sizes[gi][0]}x{sizes[gi][1]}: "
+                    "rendered frames must all be the size of the first one"
+                )
+
             page_image.paste(image, (x, y))
 
             frames_data[str(gi)] = {

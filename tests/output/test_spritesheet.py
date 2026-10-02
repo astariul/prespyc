@@ -7,7 +7,7 @@ import json
 import pytest
 from PIL import Image
 
-from prespyc.output.spritesheet import MAX_ATLAS_SIZE, Spritesheet, plan_pages
+from prespyc.output.spritesheet import MAX_ATLAS_SIZE, RenderedFrames, Spritesheet, plan_pages
 
 
 def frames(count: int, size: tuple[int, int] = (30, 20)) -> list[Image.Image]:
@@ -108,3 +108,52 @@ def test_zero_size_bounds_give_a_zero_anchor():
     page = sheet.pack()[0]
 
     assert page.data["frames"]["0"]["anchor"] == {"x": 0, "y": 0}
+
+
+class CountingRender:
+    """Renders plain frames and records which ones were asked for."""
+
+    def __init__(self, size: tuple[int, int] = (30, 20)) -> None:
+        self.size = size
+        self.calls: list[int] = []
+
+    def __call__(self, index: int) -> Image.Image:
+        self.calls.append(index)
+        return Image.new("RGBA", self.size, (255, 0, 0, 128))
+
+
+def test_rendered_frames_are_drawn_once_each():
+    render = CountingRender()
+    sheet = Spritesheet("s", frames=RenderedFrames(render, 5))
+
+    sheet.pack()
+
+    assert sorted(render.calls) == [0, 1, 2, 3, 4]
+
+
+def test_rendered_frames_are_drawn_a_page_at_a_time():
+    render = CountingRender((4000, 4000))
+    pages = Spritesheet("s", frames=RenderedFrames(render, 10)).pages(max_size=8192)
+
+    first = next(pages)
+
+    assert sorted(render.calls) == [0, 1, 2, 3]
+    assert sorted(first.data["frames"]) == ["0", "1", "2", "3"]
+
+
+def test_rendered_frames_pack_like_a_list():
+    rendered = Spritesheet("s", frames=RenderedFrames(CountingRender(), 7), bounds=(-10.0, -5.0, 20.0, 15.0))
+    listed = Spritesheet("s", frames=frames(7), bounds=(-10.0, -5.0, 20.0, 15.0))
+
+    [a], [b] = rendered.pack(), listed.pack()
+
+    assert a.data == b.data
+    assert a.image.tobytes() == b.image.tobytes()
+
+
+def test_rendered_frames_must_share_a_size():
+    sizes = [(30, 20), (30, 20), (31, 20)]
+    sheet = Spritesheet("s", frames=RenderedFrames(lambda index: Image.new("RGBA", sizes[index]), 3))
+
+    with pytest.raises(ValueError, match="Frame 2 is 31x20"):
+        sheet.pack()

@@ -297,7 +297,7 @@ flag, build the sheet and set them before writing:
 ```python
 from prespyc.output.exporter import build_spritesheet
 
-sheet = build_spritesheet(composed, "7519", zoom=2)      # renders every frame
+sheet = build_spritesheet(composed, "7519", zoom=2)      # frames render when their page is packed
 n = len(sheet.frames)
 
 sheet.animations = {"0": list(range(n))}
@@ -307,9 +307,11 @@ sheet.write("out/", quality=90)
 ```
 
 `Spritesheet(name, frames, bounds, flash_frames, animations, zoom)` — `frames` is a list of
-`PIL.Image`, `bounds` is `(xmin, ymin, xmax, ymax)` in **output pixels** (twips / 20 * zoom) and
-drives the anchor. `pack(margin, max_size)` returns `Page(name, image, data)` objects if you want the
-images and JSON without writing them.
+`PIL.Image`, or `RenderedFrames(render, count)` to draw each frame only when its page is packed:
+memory stays bounded by a page, whatever the length. Rendered frames must share one size. `bounds` is
+`(xmin, ymin, xmax, ymax)` in **output pixels** (twips / 20 * zoom) and drives the anchor.
+`pack(margin, max_size)` returns `Page(name, image, data)` objects if you want the images and JSON
+without writing them; `pages()` yields them one at a time.
 
 ## Replacing ffdec
 
