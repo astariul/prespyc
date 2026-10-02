@@ -43,7 +43,8 @@ def ffdec_export(
     the character is not exported), which is the layout ffdec produces.
 
     `chids` restricts the export to those character ids. `frame_idx` renders one frame only, and
-    `subframes` splits that frame into that many sub-steps, as ffdec's `-sublength` does.
+    `subframes` plays that frame for that many steps, as ffdec's `-sublength` does: the frame stays,
+    its nested clips play.
 
     `export_type="script"` is **not** supported: it produced decompiled ActionScript, which
     `prespyc` does not do. Read the values directly instead — `SwfFile.variables` runs the
@@ -82,17 +83,27 @@ def ffdec_export(
         directory = out / (f"{prefix}_{character_id}_{name}" if name else f"{prefix}_{character_id}")
         directory.mkdir(parents=True, exist_ok=True)
 
-        for index, frame in enumerate(_frames(drawable, frame_idx, subframes)):
-            converter.to_image(drawable, frame).save(directory / f"{index + 1}.png", format="PNG")
+        # Every frame on the canvas of the whole character, as ffdec draws them.
+        bounds = converter.canvas_bounds(drawable)
+
+        for index, (target, frame) in enumerate(_frames(drawable, frame_idx, subframes)):
+            converter.to_image(target, frame, bounds).save(directory / f"{index + 1}.png", format="PNG")
 
 
-def _frames(drawable: Drawable, frame_idx: int | None, subframes: int | None) -> list[int]:
+def _frames(drawable: Drawable, frame_idx: int | None, subframes: int | None) -> list[tuple[Drawable, int]]:
+    """What to draw for each file, at which frame."""
     if frame_idx is None:
-        return list(range(drawable.frames_count(True)))
+        return [(drawable, frame) for frame in range(drawable.frames_count(True))]
 
     if not subframes or subframes <= 1:
-        return [frame_idx]
+        return [(drawable, frame_idx)]
 
-    # ffdec's -sublength splits one frame into several steps. Without sub-frame interpolation the
-    # honest equivalent is to repeat the frame, so the frame count the caller expects still matches.
-    return [frame_idx] * subframes
+    timeline = getattr(drawable, "timeline", None)
+
+    if timeline is None:
+        return [(drawable, frame_idx)] * subframes
+
+    # A one-frame timeline holds the frame, while the clips it places play from their start.
+    pinned = timeline.keep_frame_by_number(frame_idx + 1)
+
+    return [(pinned, subframe) for subframe in range(subframes)]

@@ -67,6 +67,16 @@ def test_single_frame_and_subframes(tmp_path):
     ]
 
 
+def test_subframes_play_the_nested_clips(tmp_path):
+    # anim0R holds one frame, whose child animates over 40.
+    ffdec_export("sprite", fixture("extractor", "1047", "1047.swf"), tmp_path, chids=[62], frame_idx=0, subframes=3)
+
+    images = [Image.open(tmp_path / "DefineSprite_62_anim0R" / f"{i}.png").convert("RGBA") for i in (1, 2, 3)]
+
+    assert len({image.size for image in images}) == 1
+    assert len({image.tobytes() for image in images}) == 3
+
+
 def test_clean_folder(tmp_path):
     stale = tmp_path / "stale"
     stale.mkdir()

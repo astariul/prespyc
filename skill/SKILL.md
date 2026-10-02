@@ -330,7 +330,7 @@ For a pipeline still reading ffdec's on-disk layout, the shim writes the same tr
 from prespyc.output.ffdec_compat import ZOOM, ffdec_export
 
 ffdec_export("sprite", "1047.swf", "out/", chids=[62])
-ffdec_export("sprite", "1047.swf", "out/", chids=[62], frame_idx=3, subframes=4)
+ffdec_export("sprite", "1047.swf", "out/", chids=[62], frame_idx=3, subframes=4)   # frame 4 stays, its clips play
 ```
 
 `export_type="script"` **raises `NotImplementedError`**: `prespyc` does not decompile ActionScript.
