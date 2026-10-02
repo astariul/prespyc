@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, Self
 
@@ -40,6 +41,12 @@ class GradientGlowFilter(Filter):
     def __post_init__(self) -> None:
         assert len(self.gradient_colors) == self.num_colors
         assert len(self.gradient_ratio) == self.num_colors
+
+    def spread(self) -> tuple[float, float]:
+        return (
+            self.blur_x + abs(self.distance * math.cos(self.angle)),
+            self.blur_y + abs(self.distance * math.sin(self.angle)),
+        )
 
     @classmethod
     def _read(cls, reader: Reader) -> Self:

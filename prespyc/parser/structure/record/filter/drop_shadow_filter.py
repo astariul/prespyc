@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, Self
 
@@ -28,6 +29,12 @@ class DropShadowFilter(Filter):
     knockout: bool
     composite_source: bool
     passes: int
+
+    def spread(self) -> tuple[float, float]:
+        return (
+            self.blur_x + abs(self.distance * math.cos(self.angle)),
+            self.blur_y + abs(self.distance * math.sin(self.angle)),
+        )
 
     @classmethod
     def _read(cls, reader: Reader) -> Self:

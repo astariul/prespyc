@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 from prespyc.extractor.timeline.frame import Frame
@@ -26,7 +27,7 @@ class Timeline:
     script stops it, and each child playing from the frame placing it.
     """
 
-    __slots__ = ("_playback", "bounds", "frames")
+    __slots__ = ("_filter_room", "_playback", "bounds", "frames")
 
     def __init__(self, bounds: Rectangle, *frames: Frame) -> None:
         assert len(frames) > 0
@@ -38,6 +39,7 @@ class Timeline:
         """Frames of the timeline, in play order."""
 
         self._playback: _Playback | None = None
+        self._filter_room: tuple[int, int] | None = None
 
     def frames_count(self, recursive: bool = False) -> int:
         count = len(self.frames)
@@ -52,6 +54,41 @@ class Timeline:
                 count = frame_count
 
         return count
+
+    @property
+    def filter_room(self) -> tuple[int, int]:
+        """
+        How far the filters of the tree draw beyond the bounds, in twips, on x and on y.
+
+        It is FFdec's reckoning: the widest spread of the filters of any placement, at any depth, in
+        whole pixels, whatever the matrices.
+        """
+        if self._filter_room is None:
+            room_x = room_y = 0
+            seen: set[int] = set()
+
+            for frame in self.frames:
+                for object in frame.objects.values():
+                    if id(object.object) not in seen:
+                        seen.add(id(object.object))
+                        timeline = (
+                            object.object
+                            if isinstance(object.object, Timeline)
+                            else getattr(object.object, "timeline", None)
+                        )
+
+                        if isinstance(timeline, Timeline):
+                            child_x, child_y = timeline.filter_room
+                            room_x, room_y = max(room_x, child_x), max(room_y, child_y)
+
+                    if object.filters:
+                        spreads = [filter.spread() for filter in object.filters]
+                        room_x = max(room_x, math.ceil(sum(x for x, _ in spreads)) * 20)
+                        room_y = max(room_y, math.ceil(sum(y for _, y in spreads)) * 20)
+
+            self._filter_room = (room_x, room_y)
+
+        return self._filter_room
 
     @property
     def loops(self) -> bool:

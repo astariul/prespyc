@@ -151,6 +151,10 @@ Converter(FitSizeResizer(128, 128)).to_webp(sprite, frame=3, lossless=True)   # 
 
 An empty drawable (0x0 bounds) renders as a blank image, 1x1 unless the resizer asks for more.
 
+The canvas is `converter.canvas_bounds(drawable)`: the bounds, plus the room filters draw over on
+every side (FFdec's reckoning). Rendering a sprite one pinned frame at a time? Pass that same
+`bounds=` to every call, so the frames share one canvas and one anchor.
+
 `Converter(resizer=None, background_color=None, rasterizer=None, subpixel_stroke_width=True)`
 
 - `background_color` — a CSS colour; `None` keeps the canvas transparent.

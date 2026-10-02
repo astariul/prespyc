@@ -37,7 +37,7 @@ def build_spritesheet(
     frame_count = drawable.frames_count(recursive)
     frames = RenderedFrames(lambda frame: converter.to_image(drawable, frame), frame_count)
 
-    bounds = drawable.bounds
+    bounds = converter.canvas_bounds(drawable)
     scale = zoom / 20
 
     return Spritesheet(
