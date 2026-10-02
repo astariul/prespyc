@@ -152,9 +152,8 @@ An empty drawable (0x0 bounds) renders as a blank image, 1x1 unless the resizer 
 `Converter(resizer=None, background_color=None, rasterizer=None, subpixel_stroke_width=True)`
 
 - `background_color` — a CSS colour; `None` keeps the canvas transparent.
-- `subpixel_stroke_width=False` — clamps strokes to a 1px minimum and marks them
-  `non-scaling-stroke`. This is closer to how Flash drew thin lines at native size, at the cost of
-  correct stroke width when rescaled. Use it when hairlines come out faint.
+- `subpixel_stroke_width=False` — widens every stroke to one pixel of the output, through the zoom
+  and the scale of every placement, as Flash draws hairlines. Use it when hairlines come out faint.
 
 ## Customizing one sprite
 

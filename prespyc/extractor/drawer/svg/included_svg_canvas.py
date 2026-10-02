@@ -21,14 +21,14 @@ class IncludedSvgCanvas(BaseSvgCanvas):
 
     __slots__ = ("_defs_element", "_root", "ids")
 
-    def __init__(self, root: BaseSvgCanvas, defs: XmlElement, subpixel_stroke_width: bool = True) -> None:
+    def __init__(self, root: BaseSvgCanvas, defs: XmlElement) -> None:
         self._root = root
         self._defs_element = defs
 
         self.ids: list[str] = []
         """Ids of the objects drawn here. Each one is referenced by a `<use>` element."""
 
-        super().__init__(SvgBuilder(defs, subpixel_stroke_width))
+        super().__init__(SvgBuilder(defs))
 
     def render(self):
         raise RuntimeError("This is an internal implementation, rendering is performed by the root canvas")

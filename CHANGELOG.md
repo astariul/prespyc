@@ -14,6 +14,7 @@
 * ⭐ Draw buttons (up state) and static texts (`DefineText`)
 * 🪲 Drop gradient stops whose ratio does not exceed the previous one
 * 🪲 An empty drawable renders as a blank image instead of failing in the rasterizer
+* 🪲 `subpixel_stroke_width=False` floors strokes at one output pixel, through the zoom and the placements, instead of relying on the `vector-effect` resvg ignores
 
 
 ## [v0.1.0] - 09/09/2026s

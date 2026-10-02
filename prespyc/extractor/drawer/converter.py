@@ -42,20 +42,25 @@ class Converter:
         """SVG rasterizer. `None` picks the best available backend on first use."""
 
         self.subpixel_stroke_width = subpixel_stroke_width
-        """See `SvgBuilder.subpixel_stroke_width`."""
+        """See `SvgCanvas.subpixel_stroke_width`: when false, strokes are at least one output pixel wide."""
 
     def to_svg(self, drawable: Drawable, frame: int = 0) -> str:
         """Render to SVG, applying the resizer when there is one."""
         bounds = drawable.bounds
-        canvas = SvgCanvas(bounds, self.subpixel_stroke_width)
-        drawable.draw(canvas, frame)
-
-        if self.resizer is None:
-            return canvas.render()
-
         width = bounds.width / 20
         height = bounds.height / 20
+
+        if self.resizer is None:
+            canvas = SvgCanvas(bounds, self.subpixel_stroke_width)
+            drawable.draw(canvas, frame)
+
+            return canvas.render()
+
         new_width, new_height = self.resizer.scale(width, height)
+        scale = new_width / width if width else (new_height / height if height else 1.0)
+
+        canvas = SvgCanvas(bounds, self.subpixel_stroke_width, scale)
+        drawable.draw(canvas, frame)
 
         # Resizing keeps the drawing untouched and only restates the output size, so the viewBox has
         # to carry the original size.

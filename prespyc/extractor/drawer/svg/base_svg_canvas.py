@@ -67,7 +67,7 @@ class BaseSvgCanvas(ABC):
     ) -> None:
         from prespyc.extractor.drawer.svg.included_svg_canvas import IncludedSvgCanvas
 
-        included = IncludedSvgCanvas(self, self._defs(), self._builder.subpixel_stroke_width)
+        included = IncludedSvgCanvas(self, self._defs())
 
         obj.draw(included, frame)
 
