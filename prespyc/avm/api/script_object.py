@@ -99,6 +99,29 @@ def to_json_value(value: Any) -> Any:
     return value
 
 
+def to_python(value: Any) -> Any:
+    """
+    Convert a script value into plain Python values, ready for `json.dumps()`.
+
+    Unlike `to_json_value()`, an `Object` is always a `dict`, even when its keys happen to be
+    `0..n-1`: a table indexed by id keeps its shape.
+    """
+    from prespyc.avm.api.script_array import ScriptArray
+
+    if isinstance(value, ScriptArray):
+        value = value.json_serialize()
+    elif isinstance(value, ScriptObject):
+        value = dict(value.items())
+
+    if isinstance(value, dict):
+        return {key: to_python(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple)):
+        return [to_python(item) for item in value]
+
+    return to_json_value(value)
+
+
 def _keyed(mapping: dict[Any, Any] | None) -> dict[Any, Any]:
     """Copy a mapping, coercing its keys as PHP does — an array literal is already normalised."""
     if mapping is None:

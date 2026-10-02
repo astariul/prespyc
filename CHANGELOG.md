@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+* ⭐ `prespyc.to_python()`: script values as plain dicts and lists
 * 🪲 Drop gradient stops whose ratio does not exceed the previous one
 
 

@@ -92,6 +92,7 @@ swf.header.version           # 7
 swf.frame_rate               # 20, clamped to 1..120
 swf.display_bounds           # Rectangle, in twips
 swf.variables                # ActionScript 2 globals, from the DoAction tags
+prespyc.to_python(swf.variables)   # the same as plain dicts and lists, JSON-ready
 
 ex = swf.extractor
 ex.exported                  # {"anim0R": 62, "staticR": 66, ...} name -> character id
