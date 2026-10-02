@@ -43,3 +43,36 @@ def test_read_all_parameters():
     assert matrix.rotate_skew1 == -0.8749542236328125
     assert matrix.translate_x == -102
     assert matrix.translate_y == -1363
+
+
+def test_compose_applies_the_right_matrix_first():
+    parent = Matrix(scale_x=2.0, scale_y=2.0, translate_x=10, translate_y=20)
+    child = Matrix(translate_x=5, translate_y=-5)
+
+    assert parent @ child == Matrix(scale_x=2.0, scale_y=2.0, translate_x=20, translate_y=10)
+    assert child @ parent == Matrix(scale_x=2.0, scale_y=2.0, translate_x=15, translate_y=15)
+
+
+def test_compose_rotations():
+    import math
+
+    def rotation(degrees: float) -> Matrix:
+        angle = math.radians(degrees)
+        return Matrix(math.cos(angle), math.cos(angle), math.sin(angle), -math.sin(angle))
+
+    composed = rotation(30) @ rotation(60)
+
+    assert math.isclose(composed.scale_x, 0.0, abs_tol=1e-12)
+    assert math.isclose(composed.rotate_skew0, 1.0)
+    assert math.isclose(composed.rotate_skew1, -1.0)
+    assert math.isclose(composed.scale_y, 0.0, abs_tol=1e-12)
+
+
+def test_compose_transforms_a_point_like_both_matrices():
+    parent = Matrix(scale_x=0.5, scale_y=1.5, rotate_skew0=0.25, rotate_skew1=-0.75, translate_x=100, translate_y=-40)
+    child = Matrix(scale_x=-1.0, scale_y=2.0, rotate_skew0=0.5, translate_x=30, translate_y=12)
+
+    x, y = child.transform_x(64, -32), child.transform_y(64, -32)
+
+    assert (parent @ child).transform_x(64, -32) == parent.transform_x(x, y)
+    assert (parent @ child).transform_y(64, -32) == parent.transform_y(x, y)

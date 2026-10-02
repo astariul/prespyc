@@ -230,6 +230,7 @@ moved = obj.with_placement(tag_matrix=Matrix(translate_x=200, translate_y=-40))
 swapped = obj.with_placement(swf.extractor[119])
 tinted = obj.with_(color_transform=ColorTransform(red_mult=128, green_mult=128, blue_mult=128))
 added = FrameObject.place(4, swf.extractor[119], Matrix(translate_x=200))
+nested = obj.with_placement(tag_matrix=obj.tag_matrix @ child_matrix)   # `@` applies the right one first
 
 patched = Frame(frame.bounds, {**frame.objects, 3: moved}, frame.actions, frame.label)
 ```

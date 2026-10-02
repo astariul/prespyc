@@ -48,6 +48,17 @@ class Matrix:
             round_int(self.rotate_skew0 * x + self.scale_y * y + self.translate_y),
         )
 
+    def __matmul__(self, other: Matrix) -> Matrix:
+        """`self @ other`: the matrix applying `other`, then `self`, e.g. a child placement inside its parent's."""
+        return Matrix(
+            self.scale_x * other.scale_x + self.rotate_skew1 * other.rotate_skew0,
+            self.rotate_skew0 * other.rotate_skew1 + self.scale_y * other.scale_y,
+            self.rotate_skew0 * other.scale_x + self.scale_y * other.rotate_skew0,
+            self.scale_x * other.rotate_skew1 + self.rotate_skew1 * other.scale_y,
+            self.transform_x(other.translate_x, other.translate_y),
+            self.transform_y(other.translate_x, other.translate_y),
+        )
+
     def transform_x(self, x: int, y: int) -> int:
         """X coordinate of `(x, y)` transformed by the matrix."""
         return round_int(self.scale_x * x + self.rotate_skew1 * y + self.translate_x)
