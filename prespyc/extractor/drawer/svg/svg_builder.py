@@ -18,9 +18,33 @@ if TYPE_CHECKING:
     from prespyc.extractor.shape.fill_type.fill_type import FillType
     from prespyc.extractor.shape.path import Path
     from prespyc.parser.structure.record.filter.filter import Filter
+    from prespyc.parser.structure.record.gradient_record import GradientRecord
     from prespyc.parser.structure.record.rectangle import Rectangle
 
 XLINK_NS = "http://www.w3.org/1999/xlink"
+
+
+def ramp_records(records: Sequence[GradientRecord]) -> list[GradientRecord]:
+    """The records that actually colour a SWF gradient, in order.
+
+    Flash resolves a gradient through a 256-entry ramp, filling the span between
+    consecutive records; one whose ratio does not exceed the previous spans
+    nothing and never shows. SVG has no ramp -- it interpolates between stops and
+    then `spreadMethod="pad"` repeats the last one -- so keeping such a record
+    hands the whole padded area to a stop Flash ignores. Several gfx gradients end
+    on a duplicated ratio carrying `stop-opacity="0"`, which turned everything
+    outside the gradient circle transparent instead of the flat edge colour Flash
+    pads with.
+    """
+    ramp: list[GradientRecord] = []
+
+    for record in records:
+        if ramp and record.ratio <= ramp[-1].ratio:
+            continue
+
+        ramp.append(record)
+
+    return ramp
 
 
 class SvgBuilder:
@@ -153,7 +177,7 @@ class SvgBuilder:
         linear_gradient.add_attribute("x1", "-819.2")
         linear_gradient.add_attribute("x2", "819.2")
 
-        for record in style.gradient.records:
+        for record in ramp_records(style.gradient.records):
             stop = linear_gradient.add_child("stop")
             stop.add_attribute("offset", num(record.ratio / 255))
             stop.add_attribute("stop-color", record.color.hex)
@@ -184,7 +208,7 @@ class SvgBuilder:
             radial_gradient.add_attribute("fx", "0")
             radial_gradient.add_attribute("fy", num(style.gradient.focal_point * 819.2))
 
-        for record in style.gradient.records:
+        for record in ramp_records(style.gradient.records):
             stop = radial_gradient.add_child("stop")
             stop.add_attribute("offset", num(record.ratio / 255))
             stop.add_attribute("stop-color", record.color.hex)
