@@ -13,6 +13,7 @@
 * ⭐ `RenderedFrames` and `Spritesheet.pages()`: pack a page at a time, in bounded memory
 * ⭐ Draw buttons (up state) and static texts (`DefineText`)
 * 🪲 Drop gradient stops whose ratio does not exceed the previous one
+* 🪲 An empty drawable renders as a blank image instead of failing in the rasterizer
 
 
 ## [v0.1.0] - 09/09/2026s

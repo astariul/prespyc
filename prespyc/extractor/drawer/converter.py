@@ -66,7 +66,26 @@ class Converter:
         return canvas.render()
 
     def to_image(self, drawable: Drawable, frame: int = 0) -> Image.Image:
-        """Render to an RGBA image."""
+        """
+        Render to an RGBA image.
+
+        An empty drawable, sized 0 on either side, gives a blank image of the size asked for, and at
+        least one pixel: a rasterizer rejects an SVG with no size.
+        """
+        bounds = drawable.bounds
+
+        if bounds.width == 0 or bounds.height == 0:
+            from PIL import Image
+
+            width, height = bounds.width / 20, bounds.height / 20
+
+            if self.resizer is not None:
+                width, height = self.resizer.scale(width, height)
+
+            size = (max(1, round(width)), max(1, round(height)))
+
+            return Image.new("RGBA", size, self.background_color or (0, 0, 0, 0))
+
         if self.rasterizer is None:
             from prespyc.extractor.drawer.render.rasterizer import default_rasterizer
 

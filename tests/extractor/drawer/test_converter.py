@@ -58,3 +58,26 @@ def test_to_webp_with_size():
     # disagree; resvg is closest to the librsvg one. The remaining difference is antialiasing on the
     # edges: 2 pixels out of 15488 differ by more than 32/255.
     assert_image_looks_like(webp, fixture("extractor", "1047", "65_frames", "65-5-rsvg@128.webp"), delta=0.005)
+
+
+def test_empty_drawable_gives_a_transparent_pixel():
+    from prespyc.extractor.missing_character import MissingCharacter
+
+    image = Converter(ScaleResizer(2)).to_image(MissingCharacter(1))
+
+    assert image.size == (1, 1)
+    assert image.getpixel((0, 0)) == (0, 0, 0, 0)
+
+
+def test_empty_drawable_fills_the_size_asked_for():
+    from prespyc.extractor.timeline.timeline import Timeline
+
+    assert Converter(FitSizeResizer(128, 64)).to_image(Timeline.empty()).size == (128, 64)
+
+
+def test_empty_drawable_to_webp():
+    from prespyc.extractor.timeline.timeline import Timeline
+
+    webp = Converter().to_webp(Timeline.empty())
+
+    assert Image.open(io.BytesIO(webp)).size == (1, 1)

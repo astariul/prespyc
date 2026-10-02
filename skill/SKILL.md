@@ -147,6 +147,8 @@ Converter(ScaleResizer(2.0)).to_image(sprite, frame=3)     # PIL.Image, RGBA
 Converter(FitSizeResizer(128, 128)).to_webp(sprite, frame=3, lossless=True)   # bytes
 ```
 
+An empty drawable (0x0 bounds) renders as a blank image, 1x1 unless the resizer asks for more.
+
 `Converter(resizer=None, background_color=None, rasterizer=None, subpixel_stroke_width=True)`
 
 - `background_color` — a CSS colour; `None` keeps the canvas transparent.
