@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from prespyc.extractor.timeline.blend_mode import BlendMode
+from prespyc.parser.structure.record.matrix import Matrix
 
 if TYPE_CHECKING:
     from prespyc.extractor.drawable import Drawable
     from prespyc.parser.structure.record.clip_actions import ClipActions
     from prespyc.parser.structure.record.color_transform import ColorTransform
     from prespyc.parser.structure.record.filter.filter import Filter
-    from prespyc.parser.structure.record.matrix import Matrix
     from prespyc.parser.structure.record.rectangle import Rectangle
 
 
@@ -38,7 +38,12 @@ class FrameObject:
     """Bounds of the object, after applying `matrix`."""
 
     matrix: Matrix
-    """Transformation matrix to apply to the object."""
+    """
+    Transformation matrix to apply to the object.
+
+    It is the matrix of the PlaceObject tag (`tag_matrix`) already translated by the bounds offset
+    of `object`, because an object is drawn from the corner of its bounds.
+    """
 
     color_transform: ColorTransform | None = None
     """Color transformation to apply to the object."""
@@ -80,6 +85,54 @@ class FrameObject:
     recursively on sprites. Not to be confused with `color_transform`, which is always applied
     first and can be replaced by `with_()`, for a PlaceObjectX tag with the move flag set.
     """
+
+    @classmethod
+    def place(cls, depth: int, object: Drawable, tag_matrix: Matrix | None = None, **properties: Any) -> FrameObject:
+        """
+        `object` placed at `depth` the way a PlaceObject tag with `tag_matrix` places it.
+
+        `properties` sets the other fields: `color_transform`, `name`, `filters`...
+        """
+        if tag_matrix is None:
+            tag_matrix = Matrix()
+
+        bounds = object.bounds
+
+        return cls(
+            depth,
+            object,
+            bounds.transform(tag_matrix),
+            tag_matrix.translate(bounds.xmin, bounds.ymin),
+            **properties,
+        )
+
+    @property
+    def tag_matrix(self) -> Matrix:
+        """The matrix of the PlaceObject tag: `matrix` without the bounds offset of `object`."""
+        bounds = self.object.bounds
+
+        return self.matrix.translate(-bounds.xmin, -bounds.ymin)
+
+    def with_placement(self, object: Drawable | None = None, tag_matrix: Matrix | None = None) -> FrameObject:
+        """
+        Place another object, or the same one with another tag matrix, and return a new instance.
+
+        The bounds and the matrix follow. The rest of the placement is kept: color transformation,
+        mask, filters, blend mode, name, clip actions.
+        """
+        if tag_matrix is None:
+            tag_matrix = self.tag_matrix
+
+        if object is None:
+            object = self.object
+
+        bounds = object.bounds
+
+        return self.with_(
+            object=object,
+            bounds=bounds.transform(tag_matrix),
+            matrix=tag_matrix.translate(bounds.xmin, bounds.ymin),
+        )
 
     @property
     def transformed_object(self) -> Drawable:

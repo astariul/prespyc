@@ -10,7 +10,7 @@ from prespyc.parser.structure.record.matrix import Matrix
 from prespyc.parser.structure.record.rectangle import Rectangle
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator, Mapping
 
     from prespyc.extractor.drawable import Drawable
     from prespyc.extractor.drawer.drawer import Drawer
@@ -92,22 +92,8 @@ class Timeline:
         Equivalent to the "Attach Movie" action of SWF files. `name` is set on
         `FrameObject.name`.
         """
-        bounds = attachment.bounds
-        frames = [
-            frame.add_object(
-                FrameObject(
-                    depth=depth,
-                    object=attachment,
-                    bounds=bounds,
-                    matrix=Matrix(
-                        translate_x=bounds.xmin,
-                        translate_y=bounds.ymin,
-                    ),
-                    name=name,
-                )
-            )
-            for frame in self.frames
-        ]
+        object = FrameObject.place(depth, attachment, name=name)
+        frames = [frame.add_object(object) for frame in self.frames]
 
         return Timeline.create(*frames)
 
@@ -149,6 +135,38 @@ class Timeline:
             self.bounds,
             self.frames[number - 1],
         )
+
+    def pad_to(self, count: int) -> Timeline:
+        """Hold the last frame until the timeline is `count` frames long, and return a new timeline."""
+        missing = max(0, count - len(self.frames))
+
+        return Timeline(self.bounds, *self.frames, *([self.frames[-1]] * missing))
+
+    def repeat(self, times: int) -> Timeline:
+        """Play the frames `times` times in a row, and return a new timeline."""
+        return Timeline(self.bounds, *(self.frames * times))
+
+    def rotate(self, start: int) -> Timeline:
+        """
+        Start on the frame at position `start`, counting from 0, and play the frames before it last.
+
+        The loop stays the same, from another frame: several instances of a clip get out of sync.
+        """
+        return Timeline(self.bounds, *self.frames[start:], *self.frames[:start])
+
+    def hold(self, extra: Mapping[int, int]) -> Timeline:
+        """
+        Hold some frames longer and return a new timeline: the frame at position `i`, counting from
+        0, plays `1 + extra[i]` times.
+        """
+        return Timeline(
+            self.bounds,
+            *(frame for index, frame in enumerate(self.frames) for _ in range(1 + extra.get(index, 0))),
+        )
+
+    def keep_ranges(self, ranges: Iterable[tuple[int, int]]) -> Timeline:
+        """Play only the frames of the `[start, stop)` ranges, back to back, and return a new timeline."""
+        return Timeline(self.bounds, *(frame for start, stop in ranges for frame in self.frames[start:stop]))
 
     def with_bounds(self, new_bounds: Rectangle) -> Timeline:
         """Change the display bounds of the timeline and of its frames, and return a new timeline."""
@@ -196,6 +214,18 @@ class Timeline:
         Used as the fallback value when an error occurs while parsing a timeline.
         """
         return Timeline(Rectangle(0, 0, 0, 0), Frame(Rectangle(0, 0, 0, 0), {}, [], None))
+
+    @classmethod
+    def sequence(cls, *drawables: Drawable, depth: int = 1, tag_matrix: Matrix | None = None) -> Timeline:
+        """
+        A timeline playing one drawable per frame, each placed at `depth` with `tag_matrix`.
+
+        That is how a clip whose frames are states (full, harvested, empty...) is rebuilt out of other
+        characters. The bounds hold every drawable.
+        """
+        objects = [FrameObject.place(depth, drawable, tag_matrix) for drawable in drawables]
+
+        return cls.create(*(Frame(object.bounds, {depth: object}) for object in objects))
 
     @classmethod
     def create(cls, *frames: Frame) -> Timeline:

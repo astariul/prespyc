@@ -172,18 +172,20 @@ outer = swf.extractor["anim0R"]                       # 1 frame of its own, 40 r
 inner = next(iter(outer.timeline.frames[0].objects.values())).object   # the child that animates
 ```
 
-Then slice, repeat and reorder it — every result is a drawable:
+Then slice, repeat and reorder it — every result is a drawable. Frame positions count from 0:
 
 ```python
 from prespyc.extractor.timeline.timeline import Timeline
 
-tl = swf.extractor[61].timeline                                      # 40 frames
+tl = swf.extractor[61].timeline                       # 40 frames
 
-first_ten = Timeline(tl.bounds, *tl.frames[:10])                     # keep the first N
-without_last = Timeline(tl.bounds, *tl.frames[:-3])                  # drop the last N
-tripled = Timeline(tl.bounds, *(tl.frames * 3))                      # repeat the loop
-padded = Timeline(tl.bounds, *tl.frames, *([tl.frames[-1]] * 5))     # pad by holding the last frame
-labelled = tl.keep_frame_by_label("start")                           # single frame, by label
+first_ten = Timeline(tl.bounds, *tl.frames[:10])      # keep the first N
+padded = tl.pad_to(60)                                # hold the last frame up to 60 frames
+tripled = tl.repeat(3)                                # play the loop 3 times
+shifted = tl.rotate(12)                               # the same loop, from frame 12
+paused = tl.hold({0: 20, 25: 10})                     # frame 0 plays 21 times, frame 25 11 times
+takes = tl.keep_ranges([(0, 30), (33, 40)])           # cut frames 30-32 out
+labelled = tl.keep_frame_by_label("start")            # single frame, by label
 ```
 
 A `Timeline` must keep at least one frame — slicing to empty raises `AssertionError`. Use
@@ -205,39 +207,39 @@ sprite.modify(GotoAndStop("stand"))                          # a label works too
 is one child, frame 1 another:
 
 ```python
-from prespyc.extractor.timeline.frame import Frame
-from prespyc.extractor.timeline.frame_object import FrameObject
-from prespyc.parser.structure.record.matrix import Matrix
-
 full = swf.extractor[202].modify(GotoAndStop(0))
 empty = swf.extractor[202].modify(GotoAndStop(30))
 
-bounds = full.bounds.union(empty.bounds)
-sequence = [full, empty, full]
-
-composed = Timeline(
-    bounds,
-    *(
-        Frame(bounds, {0: FrameObject(depth=0, object=d, bounds=d.bounds, matrix=Matrix())})
-        for d in sequence
-    ),
-)
+composed = Timeline.sequence(full, empty, full)       # one drawable per frame
 ```
 
-**Moving, tinting or swapping a placed object.** `FrameObject.with_()` replaces only what you pass:
+**Moving, tinting or swapping a placed object.** `FrameObject.matrix` is the PlaceObject matrix
+(`tag_matrix`) already translated by the object's own bounds offset. `with_placement()` redoes both
+and keeps the colour transform, mask, filters and blend mode; `with_()` replaces raw fields:
 
 ```python
+from prespyc.extractor.timeline.frame import Frame
+from prespyc.extractor.timeline.frame_object import FrameObject
 from prespyc.parser.structure.record.color_transform import ColorTransform
+from prespyc.parser.structure.record.matrix import Matrix
 
 frame = tl.frames[0]
 obj = frame.objects[3]                                   # by depth, or frame.object_by_name("head")
 
-moved = obj.with_(matrix=Matrix(translate_x=200, translate_y=-40))
-swapped = obj.with_(object=swf.extractor[119])
+moved = obj.with_placement(tag_matrix=Matrix(translate_x=200, translate_y=-40))
+swapped = obj.with_placement(swf.extractor[119])
 tinted = obj.with_(color_transform=ColorTransform(red_mult=128, green_mult=128, blue_mult=128))
+added = FrameObject.place(4, swf.extractor[119], Matrix(translate_x=200))
 
 patched = Frame(frame.bounds, {**frame.objects, 3: moved}, frame.actions, frame.label)
+```
 
+**Swapping a character wherever the tree places it**, keeping each placement:
+
+```python
+from prespyc.extractor.modifier.substitute import Substitute
+
+variant = sprite.modify(Substitute({119: swf.extractor[119].timeline.rotate(5)}))
 ```
 
 **Recolouring a whole character**, recursively — cheaper and simpler than touching objects:

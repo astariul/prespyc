@@ -154,15 +154,8 @@ class Frame:
                     continue
 
                 is_modified = True
-                old_object_bounds = object.object.bounds
-                old_matrix = object.matrix.translate(-old_object_bounds.xmin, -old_object_bounds.ymin)
-
-                new_bounds = new_object.bounds.transform(old_matrix)
-                objects[depth] = object.with_(
-                    object=new_object,
-                    bounds=new_bounds,
-                    matrix=old_matrix.translate(new_object.bounds.xmin, new_object.bounds.ymin),
-                )
+                objects[depth] = object.with_placement(new_object)
+                new_bounds = objects[depth].bounds
 
                 if new_bounds.xmin < xmin:
                     xmin = new_bounds.xmin
