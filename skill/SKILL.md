@@ -98,6 +98,7 @@ ex = swf.extractor
 ex.exported                  # {"anim0R": 62, "staticR": 66, ...} name -> character id
 ex.sprites                   # {id: SpriteDefinition}
 ex.shapes, ex.morph_shapes, ex.images
+ex.buttons, ex.texts          # a button draws its up state, a static text its font glyphs
 ex["anim0R"]                 # by name
 ex[62]                       # by character id; a MissingCharacter if absent
 ex.timeline()                # the root timeline; timeline(False) to use frame bounds, not file bounds
@@ -351,6 +352,7 @@ rasterizing and WEBP encoding dominate, and both are native.
 - **Confirm before overwriting an output tree.** `ffdec_export(..., clean_folder=True)` deletes
   `out_folder` recursively; it defaults to `True`, matching ffdec.
 - `Timeline(bounds)` with no frames raises `AssertionError`; keep at least one.
+- Dynamic text fields (`DefineEditText`) are not drawn: a sprite placing one gets a `MissingCharacter`.
 - `Opaque15Bit` lossless bitmaps and GIF-in-JPEG-tag payloads raise `NotImplementedError`, as in
   ArakneSwf. No fixture exercises either.
 - Rendered pixels are equivalent to, not identical with, ffdec's or ArakneSwf's: a different SVG

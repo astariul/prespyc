@@ -8,24 +8,38 @@ from prespyc._util import decode_swf_text, memory_total, memory_used
 from prespyc.extractor.missing_character import MissingCharacter
 
 if TYPE_CHECKING:
+    from prespyc.extractor.button.button_definition import ButtonDefinition
     from prespyc.extractor.image.image_character import ImageCharacter
     from prespyc.extractor.morph_shape.morph_shape_definition import MorphShapeDefinition
     from prespyc.extractor.shape.shape_definition import ShapeDefinition
     from prespyc.extractor.sprite.sprite_definition import SpriteDefinition
+    from prespyc.extractor.text.text_definition import Font, TextDefinition
     from prespyc.extractor.timeline.timeline import Timeline
     from prespyc.swf_file import SwfFile
 
 
 class Extractor:
     """
-    Pulls shapes, morph shapes, sprites, images and the timeline out of a SWF file.
+    Pulls shapes, morph shapes, sprites, buttons, texts, images and the timeline out of a SWF file.
 
     Everything is lazy and memoised: a character is processed the first time it is asked for, and the
     same instance is returned afterwards. `release()` drops the caches, which also breaks the
     reference cycles between sprites and their children.
     """
 
-    __slots__ = ("_characters", "_exported", "_images", "_morph_shapes", "_shapes", "_sprites", "_timeline", "file")
+    __slots__ = (
+        "_buttons",
+        "_characters",
+        "_exported",
+        "_fonts",
+        "_images",
+        "_morph_shapes",
+        "_shapes",
+        "_sprites",
+        "_texts",
+        "_timeline",
+        "file",
+    )
 
     def __init__(self, file: SwfFile) -> None:
         self.file = file
@@ -33,6 +47,9 @@ class Extractor:
         self._shapes: dict[int, ShapeDefinition] | None = None
         self._morph_shapes: dict[int, MorphShapeDefinition] | None = None
         self._sprites: dict[int, SpriteDefinition] | None = None
+        self._buttons: dict[int, ButtonDefinition] | None = None
+        self._texts: dict[int, TextDefinition] | None = None
+        self._fonts: dict[int, Font] | None = None
         self._images: dict[int, ImageCharacter] | None = None
         self._exported: dict[str, int] | None = None
         self._timeline: Timeline | None = None
@@ -115,6 +132,62 @@ class Extractor:
         return sprites
 
     @property
+    def buttons(self) -> dict[int, ButtonDefinition]:
+        """Every button, by character id. A button draws as its up state."""
+        if self._buttons is not None:
+            return self._buttons
+
+        from prespyc.extractor.button.button_definition import ButtonDefinition
+        from prespyc.parser.structure.tag.define_button import DefineButtonTag
+        from prespyc.parser.structure.tag.define_button2 import DefineButton2Tag
+
+        self._buttons = {
+            tag.button_id: ButtonDefinition(self, tag.button_id, tag)
+            for _, tag in self.file.tags(DefineButtonTag.TYPE, DefineButton2Tag.TYPE)
+        }
+
+        return self._buttons
+
+    @property
+    def texts(self) -> dict[int, TextDefinition]:
+        """Every static text, by character id."""
+        if self._texts is not None:
+            return self._texts
+
+        from prespyc.extractor.text.text_definition import TextDefinition
+        from prespyc.parser.structure.tag.define_text import DefineTextTag
+
+        self._texts = {
+            tag.character_id: TextDefinition(self, tag.character_id, tag)
+            for _, tag in self.file.tags(DefineTextTag.TYPE_V1, DefineTextTag.TYPE_V2)
+        }
+
+        return self._texts
+
+    @property
+    def fonts(self) -> dict[int, Font]:
+        """The glyph shapes of every font, by font id."""
+        if self._fonts is not None:
+            return self._fonts
+
+        from prespyc.extractor.text.text_definition import Font
+        from prespyc.parser.structure.tag.define_font import DefineFontTag
+        from prespyc.parser.structure.tag.define_font2_or3 import DefineFont2Or3Tag
+
+        fonts: dict[int, Font] = {}
+
+        for _, tag in self.file.tags(DefineFontTag.TYPE_V1, DefineFont2Or3Tag.TYPE_V2, DefineFont2Or3Tag.TYPE_V3):
+            if isinstance(tag, DefineFontTag):
+                fonts[tag.font_id] = Font(tag.font_id, 1024, tag.glyph_shape_data)
+            else:
+                # DefineFont3 draws its glyphs 20 times finer.
+                fonts[tag.font_id] = Font(tag.font_id, 20480 if tag.version > 2 else 1024, tag.glyph_shape_table)
+
+        self._fonts = fonts
+
+        return fonts
+
+    @property
     def images(self) -> dict[int, ImageCharacter]:
         """Every raster image, by character id."""
         if self._images is None:
@@ -154,7 +227,14 @@ class Extractor:
 
         if self._characters is None:
             # Same left-wins semantics as PHP's array `+`: shapes, then sprites, then images.
-            self._characters = {**self.morph_shapes, **self.images, **self.sprites, **self.shapes}
+            self._characters = {
+                **self.buttons,
+                **self.texts,
+                **self.morph_shapes,
+                **self.images,
+                **self.sprites,
+                **self.shapes,
+            }
 
         return self._characters.get(character_id) or MissingCharacter(character_id)
 
@@ -206,6 +286,9 @@ class Extractor:
         """
         self._characters = None
         self._sprites = None
+        self._buttons = None
+        self._texts = None
+        self._fonts = None
         self._images = None
         self._shapes = None
         self._morph_shapes = None

@@ -36,3 +36,9 @@ class Substitute(BaseCharacterModifier):
 
     def apply_on_image(self, image):
         return self._replacements.get(image.character_id, image)
+
+    def apply_on_button(self, button):
+        return self._replacements.get(button.id, button)
+
+    def apply_on_text(self, text):
+        return self._replacements.get(text.id, text)

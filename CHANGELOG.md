@@ -11,6 +11,7 @@
 * ⭐ `Matrix @ Matrix`: composition
 * ⭐ `ShapeBuilder`: draw a shape character from scratch
 * ⭐ `RenderedFrames` and `Spritesheet.pages()`: pack a page at a time, in bounded memory
+* ⭐ Draw buttons (up state) and static texts (`DefineText`)
 * 🪲 Drop gradient stops whose ratio does not exceed the previous one
 
 

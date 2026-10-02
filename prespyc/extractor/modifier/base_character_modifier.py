@@ -5,10 +5,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from prespyc.extractor.button.button_definition import ButtonDefinition
     from prespyc.extractor.image.image_character import ImageCharacter
     from prespyc.extractor.morph_shape.morph_shape_definition import MorphShapeDefinition
     from prespyc.extractor.shape.shape_definition import ShapeDefinition
     from prespyc.extractor.sprite.sprite_definition import SpriteDefinition
+    from prespyc.extractor.text.text_definition import TextDefinition
     from prespyc.extractor.timeline.frame import Frame
     from prespyc.extractor.timeline.timeline import Timeline
 
@@ -39,3 +41,9 @@ class BaseCharacterModifier:
 
     def apply_on_image(self, image: ImageCharacter) -> ImageCharacter:
         return image
+
+    def apply_on_button(self, button: ButtonDefinition) -> ButtonDefinition:
+        return button
+
+    def apply_on_text(self, text: TextDefinition) -> TextDefinition:
+        return text

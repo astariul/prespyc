@@ -232,7 +232,7 @@ class TimelineProcessor:
             clip_depth=getattr(tag, "clip_depth", None),
             name=self._decode(getattr(tag, "name", None)),
             filters=filters,
-            blend_mode=_blend_mode(getattr(tag, "blend_mode", None)),
+            blend_mode=BlendMode.of(getattr(tag, "blend_mode", None)),
             ratio=ratio,
             clip_actions=getattr(tag, "clip_actions", None),
         )
@@ -258,7 +258,7 @@ class TimelineProcessor:
         if blend_mode is not None or surface_filter_list is not None:
             object_properties = object_properties.with_(
                 filters=surface_filter_list,
-                blend_mode=_blend_mode(blend_mode) if blend_mode is not None else None,
+                blend_mode=BlendMode.of(blend_mode) if blend_mode is not None else None,
             )
 
         if tag.color_transform is not None or tag.clip_depth is not None or tag.name is not None:
@@ -282,14 +282,6 @@ class TimelineProcessor:
             return None
 
         return decode_swf_text(raw, self._extractor.file.header.version)
-
-
-def _blend_mode(value: int | None) -> BlendMode:
-    """`BlendMode` for a raw blend mode value, defaulting to `NORMAL` for a missing or unknown one."""
-    try:
-        return BlendMode(value if value is not None else 1)
-    except ValueError:
-        return BlendMode.NORMAL
 
 
 def _parsed_tags(tags: Iterable[Any]) -> Iterator[Any]:
