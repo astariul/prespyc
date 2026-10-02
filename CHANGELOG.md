@@ -9,6 +9,7 @@
 * ⭐ `Timeline.pad_to()`, `repeat()`, `rotate()`, `hold()`, `keep_ranges()`, `sequence()`
 * ⭐ `Substitute` modifier: swap characters by id through the tree
 * ⭐ `Matrix @ Matrix`: composition
+* ⭐ `ShapeBuilder`: draw a shape character from scratch
 * 🪲 Drop gradient stops whose ratio does not exceed the previous one
 
 

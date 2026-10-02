@@ -243,6 +243,21 @@ from prespyc.extractor.modifier.substitute import Substitute
 variant = sprite.modify(Substitute({119: swf.extractor[119].timeline.rotate(5)}))
 ```
 
+**Drawing a shape from scratch**, e.g. a bitmap stretched over a diamond. Coordinates are absolute
+twips; `line(LineStyle(...))` and `curve_to()` work the same way:
+
+```python
+from prespyc.extractor.shape.shape_builder import ShapeBuilder
+from prespyc.parser.structure.record.shape.fill_style import FillStyle
+
+tile = (
+    ShapeBuilder(swf.extractor)
+    .fill(FillStyle(FillStyle.REPEATING_BITMAP, bitmap_id=62, bitmap_matrix=Matrix(20.0, 20.0)))
+    .move_to(-570, -1).line_to(-9, 288).line_to(552, -1).line_to(-9, -288).line_to(-570, -1)
+    .build(63)                                        # bounds from the edges, unless `bounds=`
+)
+```
+
 **Recolouring a whole character**, recursively — cheaper and simpler than touching objects:
 
 ```python
