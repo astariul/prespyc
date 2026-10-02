@@ -196,3 +196,20 @@ def test_move_depth_not_exists_ignore_error(swf_builder: SwfBuilder):
     processor = TimelineProcessor(extractor)
 
     assert processor.process(sprite.tag.tags) == Timeline.empty()
+
+
+def test_placement_keeps_its_clip_actions():
+    from prespyc.avm.script import Property, Script
+    from prespyc.parser.structure.record.clip_event_flags import ClipEventFlags
+    from prespyc.swf_file import SwfFile
+    from tests.support import fixture
+
+    # Sprite 23 places character 22 on frame 109 with `onClipEvent(enterFrame)` fading its parent.
+    frames = SwfFile(fixture("extractor", "1001", "1001.swf")).extractor[23].timeline.frames
+
+    [handler] = frames[108].objects[144].clip_actions.records
+
+    assert handler.flags.has(ClipEventFlags.ENTER_FRAME)
+    assert Script(handler.actions).properties_written == {Property.ALPHA}
+    assert frames[107].objects.get(144) is None
+    assert frames[109].objects[144].clip_actions is frames[108].objects[144].clip_actions

@@ -9,6 +9,7 @@ from prespyc.extractor.timeline.blend_mode import BlendMode
 
 if TYPE_CHECKING:
     from prespyc.extractor.drawable import Drawable
+    from prespyc.parser.structure.record.clip_actions import ClipActions
     from prespyc.parser.structure.record.color_transform import ColorTransform
     from prespyc.parser.structure.record.filter.filter import Filter
     from prespyc.parser.structure.record.matrix import Matrix
@@ -68,6 +69,9 @@ class FrameObject:
     the end shape. Only meaningful for a morph shape.
     """
 
+    clip_actions: ClipActions | None = None
+    """The `onClipEvent()` handlers of the placement. Read them with `prespyc.avm.script.Script`."""
+
     _color_transforms: tuple[ColorTransform, ...] = ()
     """
     Color transformations to apply to the object, filled by `transform_colors()`.
@@ -106,6 +110,7 @@ class FrameObject:
             self.filters,
             self.blend_mode,
             self.ratio,
+            self.clip_actions,
             (*self._color_transforms, color_transform),
         )
 
@@ -137,5 +142,6 @@ class FrameObject:
             filters if filters is not None else self.filters,
             blend_mode if blend_mode is not None else self.blend_mode,
             ratio if ratio is not None else self.ratio,
+            self.clip_actions,
             self._color_transforms,
         )

@@ -249,6 +249,7 @@ class TimelineProcessor:
             filters=filters,
             blend_mode=_blend_mode(getattr(tag, "blend_mode", None)),
             ratio=ratio,
+            clip_actions=getattr(tag, "clip_actions", None),
         )
 
     def _modify_object(

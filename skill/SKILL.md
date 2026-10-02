@@ -115,6 +115,24 @@ swf = prespyc.open("corrupted.swf", errors=Errors.NONE)          # fail-safe: pa
 swf = prespyc.open("x.swf", errors=Errors.IGNORE_INVALID_TAG)    # strict, but skip bad tags
 ```
 
+## Read the scripts of a sprite
+
+No decompiler: `Script` reads what an action block does off its bytecode, constant pool resolved.
+
+```python
+from prespyc.avm.script import Property, Script
+
+frame = sprite.timeline.frames[0]
+frame_scripts = [Script(tag.actions) for tag in frame.actions]         # DoAction blocks
+handlers = frame.objects[1].clip_actions                               # onClipEvent(), or None
+load = Script(handlers.records[0].actions)
+
+load.halts                   # stop() or gotoAndStop()
+load.uses_random             # random() or Math.random()
+load.properties_written      # {Property.XSCALE, Property.ROTATION}, by setProperty() or by name
+load.calls, load.strings     # {"gotoAndStop"}, every string pushed
+```
+
 ## Control the rendering
 
 ```python
