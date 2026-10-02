@@ -30,9 +30,10 @@ class Drawable(Protocol):
 
     def draw(self, drawer: Drawer, frame: int = 0) -> Drawer:
         """
-        Draw the character on `drawer` and return it.
+        Draw the character on `drawer`, as it is after playing `frame` frames, and return it.
 
-        A `frame` past the last one draws the last frame.
+        Past the last frame, a timeline starts over unless a script stops it, then it holds its last
+        frame.
         """
         ...
 

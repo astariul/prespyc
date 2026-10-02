@@ -37,6 +37,8 @@ Six facts that prevent most mistakes:
    with `.width` / `.height` properties — divide by 20 for pixels, then multiply by the zoom.
 2. **`frames_count(recursive=True)` is the number that matters.** A sprite whose own timeline has one
    frame still animates through a nested sprite. Always export `range(drawable.frames_count(True))`.
+   A nested clip plays from the frame placing it, and loops unless a script, or a load handler of
+   its placement, runs `stop()` or `gotoAndStop()`: then it holds its last frame (`timeline.loops`).
 3. **Everything returns a new instance.** `transform_colors()`, `modify()`, `with_*()`,
    `keep_frame_by_*()` never mutate. Rebind the result.
 4. **`bounds`, `timeline`, `shape`, `exported`, `shapes`, `sprites`, `images` are properties**, not

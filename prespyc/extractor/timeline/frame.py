@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from prespyc.parser.structure.record.rectangle import Rectangle
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from prespyc.avm.processor import Processor
     from prespyc.avm.state import State
     from prespyc.extractor.drawer.drawer import Drawer
@@ -47,15 +49,21 @@ class Frame:
 
         return count
 
-    def draw(self, drawer: Drawer, frame: int = 0) -> Drawer:
+    def draw(self, drawer: Drawer, frame: int = 0, ticks: Mapping[int, int] | None = None) -> Drawer:
+        """
+        Draw the frame, its objects having played `frame` frames each, or as many as `ticks` holds
+        for their depth.
+        """
         drawer.area(self.bounds)
 
         # Active clips, as the drawer-generated clip id to the depth the clip applies up to.
         active_clips: dict[str, int] = {}
 
-        for object in self.objects.values():
+        for depth, object in self.objects.items():
+            tick = ticks.get(depth, frame) if ticks is not None else frame
+
             if object.clip_depth is not None:
-                id = drawer.start_clip(object.object, object.matrix, frame)
+                id = drawer.start_clip(object.object, object.matrix, tick)
                 active_clips[id] = object.clip_depth
 
                 continue
@@ -68,7 +76,7 @@ class Frame:
             drawer.include(
                 object.transformed_object,
                 object.matrix,
-                frame,
+                tick,
                 object.filters,
                 object.blend_mode,
                 object.name,

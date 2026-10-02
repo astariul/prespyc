@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from prespyc._util import decode_swf_text
@@ -10,7 +11,7 @@ from prespyc.errors import Errors, ProcessingInvalidDataError
 from prespyc.extractor.drawable import RatioDrawable
 from prespyc.extractor.timeline.blend_mode import BlendMode
 from prespyc.extractor.timeline.frame import Frame
-from prespyc.extractor.timeline.frame_object import FrameObject
+from prespyc.extractor.timeline.frame_object import FrameObject, new_placement
 from prespyc.extractor.timeline.timeline import Timeline
 from prespyc.parser.structure.record.rectangle import Rectangle
 from prespyc.parser.structure.tag.do_action import DoActionTag
@@ -244,9 +245,11 @@ class TimelineProcessor:
     ) -> FrameObject:
         """Handle the movement, or the property changes, of an already displayed object."""
         if tag.character_id is not None:
-            # New object to display, so the bounds and matrix follow the new object bounds
-            object_properties = object_properties.with_placement(
-                self._extractor.character(tag.character_id), tag.matrix
+            # A new object replaces the one at that depth: the bounds and matrix follow its bounds,
+            # and it plays from its first frame
+            object_properties = replace(
+                object_properties.with_placement(self._extractor.character(tag.character_id), tag.matrix),
+                placement=new_placement(),
             )
         elif tag.matrix is not None:
             object_properties = object_properties.with_placement(tag_matrix=tag.matrix)

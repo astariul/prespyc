@@ -64,7 +64,7 @@ class ClipPathBuilder:
         blend_mode: BlendMode = BlendMode.NORMAL,
         name: str | None = None,
     ) -> None:
-        obj.draw(ClipPathBuilder(self._clip_path, self._builder, (*self._transform, matrix)))
+        obj.draw(ClipPathBuilder(self._clip_path, self._builder, (*self._transform, matrix)), frame)
 
     def start_clip(self, obj: Drawable, matrix: Matrix, frame: int) -> str:
         return ""

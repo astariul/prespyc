@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prespyc.extractor.timeline.blend_mode import BlendMode
+from prespyc.parser.structure.record.clip_event_flags import ClipEventFlags
 from prespyc.parser.structure.record.matrix import Matrix
 
 if TYPE_CHECKING:
@@ -14,6 +16,18 @@ if TYPE_CHECKING:
     from prespyc.parser.structure.record.color_transform import ColorTransform
     from prespyc.parser.structure.record.filter.filter import Filter
     from prespyc.parser.structure.record.rectangle import Rectangle
+
+_placements = itertools.count()
+
+_UNPROMPTED_EVENTS = (
+    ClipEventFlags.LOAD | ClipEventFlags.ENTER_FRAME | ClipEventFlags.INITIALIZE | ClipEventFlags.CONSTRUCT
+)
+"""Clip events that fire without the user."""
+
+
+def new_placement() -> int:
+    """A `FrameObject.placement` no object holds yet."""
+    return next(_placements)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +91,13 @@ class FrameObject:
     clip_actions: ClipActions | None = None
     """The `onClipEvent()` handlers of the placement. Read them with `prespyc.avm.script.Script`."""
 
+    placement: int = field(default_factory=new_placement, compare=False, repr=False)
+    """
+    Identifies the placement: a moved or modified object keeps it, a newly placed one gets another.
+
+    A child plays from the frame it is placed on, so this is how a timeline knows since when.
+    """
+
     _color_transforms: tuple[ColorTransform, ...] = ()
     """
     Color transformations to apply to the object, filled by `transform_colors()`.
@@ -135,6 +156,22 @@ class FrameObject:
         )
 
     @property
+    def stops(self) -> bool:
+        """
+        Whether the clip event handlers of the placement stop the object, by a `stop()` or a
+        `gotoAndStop()` run on load or on every frame.
+        """
+        if self.clip_actions is None:
+            return False
+
+        from prespyc.avm.script import Script
+
+        return any(
+            record.flags.flags & _UNPROMPTED_EVENTS and Script(record.actions).halts
+            for record in self.clip_actions.records
+        )
+
+    @property
     def transformed_object(self) -> Drawable:
         """The object to display, after applying the color transformations."""
         object = self.object
@@ -164,6 +201,7 @@ class FrameObject:
             self.blend_mode,
             self.ratio,
             self.clip_actions,
+            self.placement,
             (*self._color_transforms, color_transform),
         )
 
@@ -178,9 +216,10 @@ class FrameObject:
         clip_depth: int | None = None,
         name: str | None = None,
         ratio: int | None = None,
+        clip_actions: ClipActions | None = None,
     ) -> FrameObject:
         """
-        Change some properties of the object and return a new instance.
+        Change some properties of the object and return a new instance, of the same placement.
 
         `None` means "keep the current value", so a property cannot be cleared this way.
         """
@@ -195,6 +234,7 @@ class FrameObject:
             filters if filters is not None else self.filters,
             blend_mode if blend_mode is not None else self.blend_mode,
             ratio if ratio is not None else self.ratio,
-            self.clip_actions,
+            clip_actions if clip_actions is not None else self.clip_actions,
+            self.placement,
             self._color_transforms,
         )
