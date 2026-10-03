@@ -16,6 +16,10 @@ class Filter(ABC):
 
     __slots__ = ()
 
+    def spread(self) -> tuple[float, float]:
+        """How far the filter draws beyond what it filters, in pixels, on x and on y."""
+        return 0.0, 0.0
+
     @staticmethod
     def read_collection(reader: Reader) -> list[Filter]:
         """

@@ -23,6 +23,14 @@ class BlendMode(IntEnum):
     OVERLAY = 13
     HARDLIGHT = 14
 
+    @classmethod
+    def of(cls, value: int | None) -> BlendMode:
+        """The blend mode of a raw tag value: `NORMAL` when it is missing or unknown."""
+        try:
+            return cls(value if value is not None else 1)
+        except ValueError:
+            return cls.NORMAL
+
     @property
     def css_value(self) -> str | None:
         """

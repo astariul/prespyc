@@ -55,22 +55,11 @@ class SvgBuilder:
     a fill reference one definition.
     """
 
-    __slots__ = ("_elements_by_id", "_svg", "subpixel_stroke_width")
+    __slots__ = ("_elements_by_id", "_svg")
 
-    def __init__(self, svg: XmlElement, subpixel_stroke_width: bool = True) -> None:
+    def __init__(self, svg: XmlElement) -> None:
         self._svg = svg
         """The element to draw on: the root `<svg>` or a `<defs>`."""
-
-        self.subpixel_stroke_width = subpixel_stroke_width
-        """
-        Whether strokes keep their real, possibly sub-pixel, SWF width.
-
-        When true, a stroke below 1px is left to the renderer's antialiasing, so it comes out blurry
-        and not fully opaque — which is *not* what Flash does, as Flash always draws a stroke at
-        least 1px wide. When false, the minimum width is 1px and `non-scaling-stroke` keeps the
-        stroke from scaling with the SVG, which approximates Flash at native size but loses the
-        relative stroke width when rescaled.
-        """
 
         self._elements_by_id: dict[str, XmlElement] = {}
 
@@ -107,13 +96,7 @@ class SvgBuilder:
                 path_element.add_attribute("stroke-opacity", num(style.line_color.opacity))
 
         if style.line_width > 0:
-            width = style.line_width / 20
-
-            if not self.subpixel_stroke_width and width < 1:
-                width = 1
-                path_element.add_attribute("vector-effect", "non-scaling-stroke")
-
-            path_element.add_attribute("stroke-width", num(width))
+            path_element.add_attribute("stroke-width", num(style.line_width / 20))
             path_element.add_attribute("stroke-linecap", "round")  # TODO use the style from LINESTYLE2 when available
             path_element.add_attribute("stroke-linejoin", "round")
 

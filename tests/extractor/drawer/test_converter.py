@@ -58,3 +58,66 @@ def test_to_webp_with_size():
     # disagree; resvg is closest to the librsvg one. The remaining difference is antialiasing on the
     # edges: 2 pixels out of 15488 differ by more than 32/255.
     assert_image_looks_like(webp, fixture("extractor", "1047", "65_frames", "65-5-rsvg@128.webp"), delta=0.005)
+
+
+def test_empty_drawable_gives_a_transparent_pixel():
+    from prespyc.extractor.missing_character import MissingCharacter
+
+    image = Converter(ScaleResizer(2)).to_image(MissingCharacter(1))
+
+    assert image.size == (1, 1)
+    assert image.getpixel((0, 0)) == (0, 0, 0, 0)
+
+
+def test_empty_drawable_fills_the_size_asked_for():
+    from prespyc.extractor.timeline.timeline import Timeline
+
+    assert Converter(FitSizeResizer(128, 64)).to_image(Timeline.empty()).size == (128, 64)
+
+
+def test_empty_drawable_to_webp():
+    from prespyc.extractor.timeline.timeline import Timeline
+
+    webp = Converter().to_webp(Timeline.empty())
+
+    assert Image.open(io.BytesIO(webp)).size == (1, 1)
+
+
+def _hairline(scale: float):
+    """A 1 twip wide stroke, placed by a sprite with `scale`."""
+    from prespyc.extractor.shape.shape_builder import ShapeBuilder
+    from prespyc.extractor.timeline.timeline import Timeline
+    from prespyc.parser.structure.record.color import Color
+    from prespyc.parser.structure.record.matrix import Matrix
+    from prespyc.parser.structure.record.shape.line_style import LineStyle
+
+    extractor = SwfFile(fixture("extractor", "1047", "1047.swf")).extractor
+    line = ShapeBuilder(extractor).line(LineStyle(1, Color(0, 0, 0))).move_to(0, 0).line_to(400, 400).build(1000)
+
+    return Timeline.sequence(line, tag_matrix=Matrix(scale_x=scale, scale_y=scale))
+
+
+def _stroke_width(svg: str) -> float:
+    import re
+
+    return float(re.search(r'stroke-width="([0-9.]+)"', svg).group(1))
+
+
+def test_minimum_stroke_width_is_one_output_pixel():
+    # 1px of the output is 1 / (2 * 0.5) user units under the zoom and the placement.
+    svg = Converter(ScaleResizer(2), subpixel_stroke_width=False).to_svg(_hairline(0.5))
+
+    assert _stroke_width(svg) == 1.0
+    assert "vector-effect" not in svg
+
+
+def test_minimum_stroke_width_follows_the_placement_scale():
+    svg = Converter(ScaleResizer(2), subpixel_stroke_width=False).to_svg(_hairline(4.0))
+
+    assert _stroke_width(svg) == 0.125
+
+
+def test_subpixel_stroke_width_keeps_the_real_width():
+    svg = Converter(ScaleResizer(2)).to_svg(_hairline(4.0))
+
+    assert _stroke_width(svg) == 0.05

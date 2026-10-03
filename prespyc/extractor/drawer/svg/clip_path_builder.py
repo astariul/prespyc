@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from prespyc._util import num
 from prespyc.extractor.timeline.blend_mode import BlendMode
+from prespyc.parser.structure.record.matrix import Matrix
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
     from prespyc.extractor.shape.path import Path
     from prespyc.extractor.shape.shape import Shape
     from prespyc.parser.structure.record.filter.filter import Filter
-    from prespyc.parser.structure.record.matrix import Matrix
     from prespyc.parser.structure.record.rectangle import Rectangle
 
 
@@ -36,7 +36,10 @@ class ClipPathBuilder:
         self._transform = tuple(transform)
 
     def area(self, bounds: Rectangle) -> None:
-        pass
+        # A placement matrix holds the bounds offset of what it places: undo it, as the group of a
+        # drawn sprite does, or a sprite used as a mask lands off by its bounds.
+        if bounds.xmin or bounds.ymin:
+            self._transform = (*self._transform, Matrix(translate_x=-bounds.xmin, translate_y=-bounds.ymin))
 
     def shape(self, shape: Shape) -> None:
         for path in shape.paths:
@@ -61,7 +64,7 @@ class ClipPathBuilder:
         blend_mode: BlendMode = BlendMode.NORMAL,
         name: str | None = None,
     ) -> None:
-        obj.draw(ClipPathBuilder(self._clip_path, self._builder, (*self._transform, matrix)))
+        obj.draw(ClipPathBuilder(self._clip_path, self._builder, (*self._transform, matrix)), frame)
 
     def start_clip(self, obj: Drawable, matrix: Matrix, frame: int) -> str:
         return ""

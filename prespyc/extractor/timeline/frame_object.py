@@ -2,17 +2,32 @@
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from prespyc.extractor.timeline.blend_mode import BlendMode
+from prespyc.parser.structure.record.clip_event_flags import ClipEventFlags
+from prespyc.parser.structure.record.matrix import Matrix
 
 if TYPE_CHECKING:
     from prespyc.extractor.drawable import Drawable
+    from prespyc.parser.structure.record.clip_actions import ClipActions
     from prespyc.parser.structure.record.color_transform import ColorTransform
     from prespyc.parser.structure.record.filter.filter import Filter
-    from prespyc.parser.structure.record.matrix import Matrix
     from prespyc.parser.structure.record.rectangle import Rectangle
+
+_placements = itertools.count()
+
+_UNPROMPTED_EVENTS = (
+    ClipEventFlags.LOAD | ClipEventFlags.ENTER_FRAME | ClipEventFlags.INITIALIZE | ClipEventFlags.CONSTRUCT
+)
+"""Clip events that fire without the user."""
+
+
+def new_placement() -> int:
+    """A `FrameObject.placement` no object holds yet."""
+    return next(_placements)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +52,12 @@ class FrameObject:
     """Bounds of the object, after applying `matrix`."""
 
     matrix: Matrix
-    """Transformation matrix to apply to the object."""
+    """
+    Transformation matrix to apply to the object.
+
+    It is the matrix of the PlaceObject tag (`tag_matrix`) already translated by the bounds offset
+    of `object`, because an object is drawn from the corner of its bounds.
+    """
 
     color_transform: ColorTransform | None = None
     """Color transformation to apply to the object."""
@@ -68,6 +88,16 @@ class FrameObject:
     the end shape. Only meaningful for a morph shape.
     """
 
+    clip_actions: ClipActions | None = None
+    """The `onClipEvent()` handlers of the placement. Read them with `prespyc.avm.script.Script`."""
+
+    placement: int = field(default_factory=new_placement, compare=False, repr=False)
+    """
+    Identifies the placement: a moved or modified object keeps it, a newly placed one gets another.
+
+    A child plays from the frame it is placed on, so this is how a timeline knows since when.
+    """
+
     _color_transforms: tuple[ColorTransform, ...] = ()
     """
     Color transformations to apply to the object, filled by `transform_colors()`.
@@ -76,6 +106,70 @@ class FrameObject:
     recursively on sprites. Not to be confused with `color_transform`, which is always applied
     first and can be replaced by `with_()`, for a PlaceObjectX tag with the move flag set.
     """
+
+    @classmethod
+    def place(cls, depth: int, object: Drawable, tag_matrix: Matrix | None = None, **properties: Any) -> FrameObject:
+        """
+        `object` placed at `depth` the way a PlaceObject tag with `tag_matrix` places it.
+
+        `properties` sets the other fields: `color_transform`, `name`, `filters`...
+        """
+        if tag_matrix is None:
+            tag_matrix = Matrix()
+
+        bounds = object.bounds
+
+        return cls(
+            depth,
+            object,
+            bounds.transform(tag_matrix),
+            tag_matrix.translate(bounds.xmin, bounds.ymin),
+            **properties,
+        )
+
+    @property
+    def tag_matrix(self) -> Matrix:
+        """The matrix of the PlaceObject tag: `matrix` without the bounds offset of `object`."""
+        bounds = self.object.bounds
+
+        return self.matrix.translate(-bounds.xmin, -bounds.ymin)
+
+    def with_placement(self, object: Drawable | None = None, tag_matrix: Matrix | None = None) -> FrameObject:
+        """
+        Place another object, or the same one with another tag matrix, and return a new instance.
+
+        The bounds and the matrix follow. The rest of the placement is kept: color transformation,
+        mask, filters, blend mode, name, clip actions.
+        """
+        if tag_matrix is None:
+            tag_matrix = self.tag_matrix
+
+        if object is None:
+            object = self.object
+
+        bounds = object.bounds
+
+        return self.with_(
+            object=object,
+            bounds=bounds.transform(tag_matrix),
+            matrix=tag_matrix.translate(bounds.xmin, bounds.ymin),
+        )
+
+    @property
+    def stops(self) -> bool:
+        """
+        Whether the clip event handlers of the placement stop the object, by a `stop()` or a
+        `gotoAndStop()` run on load or on every frame.
+        """
+        if self.clip_actions is None:
+            return False
+
+        from prespyc.avm.script import Script
+
+        return any(
+            record.flags.flags & _UNPROMPTED_EVENTS and Script(record.actions).halts
+            for record in self.clip_actions.records
+        )
 
     @property
     def transformed_object(self) -> Drawable:
@@ -106,6 +200,8 @@ class FrameObject:
             self.filters,
             self.blend_mode,
             self.ratio,
+            self.clip_actions,
+            self.placement,
             (*self._color_transforms, color_transform),
         )
 
@@ -120,9 +216,10 @@ class FrameObject:
         clip_depth: int | None = None,
         name: str | None = None,
         ratio: int | None = None,
+        clip_actions: ClipActions | None = None,
     ) -> FrameObject:
         """
-        Change some properties of the object and return a new instance.
+        Change some properties of the object and return a new instance, of the same placement.
 
         `None` means "keep the current value", so a property cannot be cleared this way.
         """
@@ -137,5 +234,7 @@ class FrameObject:
             filters if filters is not None else self.filters,
             blend_mode if blend_mode is not None else self.blend_mode,
             ratio if ratio is not None else self.ratio,
+            clip_actions if clip_actions is not None else self.clip_actions,
+            self.placement,
             self._color_transforms,
         )

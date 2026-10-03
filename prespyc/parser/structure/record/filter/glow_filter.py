@@ -27,6 +27,9 @@ class GlowFilter(Filter):
     composite_source: bool
     passes: int
 
+    def spread(self) -> tuple[float, float]:
+        return self.blur_x, self.blur_y
+
     @classmethod
     def _read(cls, reader: Reader) -> Self:
         return cls(

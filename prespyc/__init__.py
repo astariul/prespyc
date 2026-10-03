@@ -7,6 +7,7 @@ import prespyc
 swf = prespyc.open("1047.swf")
 
 variables = swf.variables            # ActionScript 2 variables
+data = prespyc.to_python(variables)  # as plain dicts and lists
 sprite = swf.extractor["anim0R"]     # by exported name, or by character id
 svg = sprite.to_svg()
 
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from prespyc.avm.api.script_object import to_python
 from prespyc.errors import (
     CircularReferenceError,
     Errors,
@@ -51,6 +53,7 @@ __all__ = [
     "UnknownTagError",
     "export",
     "open",
+    "to_python",
 ]
 
 

@@ -39,7 +39,8 @@ def test_build_with_sprite(root_and_builder):
     root, builder = root_and_builder
     extractor = SwfFile(fixture("extractor", "mob-leponge", "mob-leponge.swf")).extractor
 
-    extractor.character(4).draw(builder)  # A sprite
+    # A sprite: its group undoes its bounds offset, as a drawn sprite's does.
+    extractor.character(4).draw(builder)
 
     builder.start_clip(extractor.character(1), Matrix(), 0)
     builder.end_clip("")
@@ -50,7 +51,7 @@ def test_build_with_sprite(root_and_builder):
         """<?xml version="1.0"?>
         <svg xmlns="http://www.w3.org/2000/svg">
             <clipPath>
-                <path fill-rule="evenodd" fill="url(#gradient-R63dfb90eb595e9795bdd21b4fefc7c4b)" stroke="none" d="M5.15 0Q5.15 2.15 3.65 3.65Q2.15 5.15 0 5.15Q-2.15 5.15 -3.65 3.65Q-5.15 2.15 -5.15 0Q-5.15 -2.15 -3.65 -3.65Q-2.15 -5.15 0 -5.15Q2.15 -5.15 3.65 -3.65Q5.15 -2.15 5.15 0" transform="matrix(1, 0, 0, 1, -5.15, -5.15) translate(5.15,5.15)"/>
+                <path fill-rule="evenodd" fill="url(#gradient-R63dfb90eb595e9795bdd21b4fefc7c4b)" stroke="none" d="M5.15 0Q5.15 2.15 3.65 3.65Q2.15 5.15 0 5.15Q-2.15 5.15 -3.65 3.65Q-5.15 2.15 -5.15 0Q-5.15 -2.15 -3.65 -3.65Q-2.15 -5.15 0 -5.15Q2.15 -5.15 3.65 -3.65Q5.15 -2.15 5.15 0" transform="matrix(1, 0, 0, 1, 5.15, 5.15) matrix(1, 0, 0, 1, -5.15, -5.15) translate(5.15,5.15)"/>
             </clipPath>
             <radialGradient gradientTransform="matrix(0.0068, 0, 0, 0.0068, 0, 0)" gradientUnits="userSpaceOnUse" spreadMethod="pad" id="gradient-R63dfb90eb595e9795bdd21b4fefc7c4b" cx="0" cy="0" r="819.2">
                 <stop offset="0" stop-color="#99795a"/>
@@ -93,3 +94,34 @@ def test_ignores_zero_width_stroke(root_and_builder):
             </clipPath>
         </svg>""",
     )
+
+
+def test_sprite_mask_lands_where_the_sprite_draws():
+    from prespyc.extractor.drawer.converter import Converter
+    from prespyc.extractor.shape.shape_builder import ShapeBuilder
+    from prespyc.extractor.timeline.frame import Frame
+    from prespyc.extractor.timeline.frame_object import FrameObject
+    from prespyc.extractor.timeline.timeline import Timeline
+    from prespyc.parser.structure.record.color import Color
+    from prespyc.parser.structure.record.shape.fill_style import FillStyle
+
+    extractor = SwfFile(fixture("extractor", "1047", "1047.swf")).extractor
+    square = (
+        ShapeBuilder(extractor)
+        .fill(FillStyle(FillStyle.SOLID, color=Color(255, 0, 0)))
+        .move_to(100, 100)
+        .line_to(300, 100)
+        .line_to(300, 300)
+        .line_to(100, 300)
+        .line_to(100, 100)
+        .build(1000)
+    )
+    # A sprite, not a shape, masks the square it covers exactly: both start at (100, 100).
+    mask = Timeline.sequence(square)
+    frame = Frame(square.bounds, {1: FrameObject.place(1, mask, clip_depth=2), 2: FrameObject.place(2, square)})
+
+    image = Converter().to_image(Timeline.create(frame))
+
+    assert image.size == (10, 10)
+    assert image.getpixel((1, 1)) == (255, 0, 0, 255)
+    assert image.getpixel((8, 8)) == (255, 0, 0, 255)

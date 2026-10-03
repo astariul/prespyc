@@ -37,6 +37,10 @@ Six facts that prevent most mistakes:
    with `.width` / `.height` properties — divide by 20 for pixels, then multiply by the zoom.
 2. **`frames_count(recursive=True)` is the number that matters.** A sprite whose own timeline has one
    frame still animates through a nested sprite. Always export `range(drawable.frames_count(True))`.
+   A nested clip plays from the frame placing it, and loops unless a script, or a load handler of
+   its placement, runs `stop()` or `gotoAndStop()`: then it holds its last frame (`timeline.loops`).
+   `frames_count(True)` reaches the longest animation at any depth; to play one frame for as long as
+   the clip it places, count that child's own `frames_count()`.
 3. **Everything returns a new instance.** `transform_colors()`, `modify()`, `with_*()`,
    `keep_frame_by_*()` never mutate. Rebind the result.
 4. **`bounds`, `timeline`, `shape`, `exported`, `shapes`, `sprites`, `images` are properties**, not
@@ -92,11 +96,13 @@ swf.header.version           # 7
 swf.frame_rate               # 20, clamped to 1..120
 swf.display_bounds           # Rectangle, in twips
 swf.variables                # ActionScript 2 globals, from the DoAction tags
+prespyc.to_python(swf.variables)   # the same as plain dicts and lists, JSON-ready
 
 ex = swf.extractor
 ex.exported                  # {"anim0R": 62, "staticR": 66, ...} name -> character id
 ex.sprites                   # {id: SpriteDefinition}
 ex.shapes, ex.morph_shapes, ex.images
+ex.buttons, ex.texts         # a button draws its up state, a static text its font glyphs
 ex["anim0R"]                 # by name
 ex[62]                       # by character id; a MissingCharacter if absent
 ex.timeline()                # the root timeline; timeline(False) to use frame bounds, not file bounds
@@ -114,6 +120,24 @@ swf = prespyc.open("corrupted.swf", errors=Errors.NONE)          # fail-safe: pa
 swf = prespyc.open("x.swf", errors=Errors.IGNORE_INVALID_TAG)    # strict, but skip bad tags
 ```
 
+## Read the scripts of a sprite
+
+No decompiler: `Script` reads what an action block does off its bytecode, constant pool resolved.
+
+```python
+from prespyc.avm.script import Property, Script
+
+frame = sprite.timeline.frames[0]
+frame_scripts = [Script(tag.actions) for tag in frame.actions]         # DoAction blocks
+handlers = frame.objects[1].clip_actions                               # onClipEvent(), or None
+load = Script(handlers.records[0].actions)
+
+load.halts                   # stop() or gotoAndStop()
+load.uses_random             # random() or Math.random()
+load.properties_written      # {Property.XSCALE, Property.ROTATION}, by setProperty() or by name
+load.calls, load.strings     # {"gotoAndStop"}, every string pushed
+```
+
 ## Control the rendering
 
 ```python
@@ -127,12 +151,17 @@ Converter(ScaleResizer(2.0)).to_image(sprite, frame=3)     # PIL.Image, RGBA
 Converter(FitSizeResizer(128, 128)).to_webp(sprite, frame=3, lossless=True)   # bytes
 ```
 
+An empty drawable (0x0 bounds) renders as a blank image, 1x1 unless the resizer asks for more.
+
+The canvas is `converter.canvas_bounds(drawable)`: the bounds, plus the room filters draw over on
+every side (FFdec's reckoning). To render a sprite one pinned frame at a time, pass that same
+`bounds=` to every call: the frames then share one canvas and one anchor.
+
 `Converter(resizer=None, background_color=None, rasterizer=None, subpixel_stroke_width=True)`
 
 - `background_color` — a CSS colour; `None` keeps the canvas transparent.
-- `subpixel_stroke_width=False` — clamps strokes to a 1px minimum and marks them
-  `non-scaling-stroke`. This is closer to how Flash drew thin lines at native size, at the cost of
-  correct stroke width when rescaled. Use it when hairlines come out faint.
+- `subpixel_stroke_width=False` — widens every stroke to one pixel of the output, through the zoom
+  and the scale of every placement, as Flash draws hairlines. Use it when hairlines come out faint.
 
 ## Customizing one sprite
 
@@ -153,18 +182,20 @@ outer = swf.extractor["anim0R"]                       # 1 frame of its own, 40 r
 inner = next(iter(outer.timeline.frames[0].objects.values())).object   # the child that animates
 ```
 
-Then slice, repeat and reorder it — every result is a drawable:
+Then slice, repeat and reorder it — every result is a drawable. Frame positions count from 0:
 
 ```python
 from prespyc.extractor.timeline.timeline import Timeline
 
-tl = swf.extractor[61].timeline                                      # 40 frames
+tl = swf.extractor[61].timeline                       # 40 frames
 
-first_ten = Timeline(tl.bounds, *tl.frames[:10])                     # keep the first N
-without_last = Timeline(tl.bounds, *tl.frames[:-3])                  # drop the last N
-tripled = Timeline(tl.bounds, *(tl.frames * 3))                      # repeat the loop
-padded = Timeline(tl.bounds, *tl.frames, *([tl.frames[-1]] * 5))     # pad by holding the last frame
-labelled = tl.keep_frame_by_label("start")                           # single frame, by label
+first_ten = Timeline(tl.bounds, *tl.frames[:10])      # keep the first N
+padded = tl.pad_to(60)                                # hold the last frame up to 60 frames
+tripled = tl.repeat(3)                                # play the loop 3 times
+shifted = tl.rotate(12)                               # the same loop, from frame 12
+paused = tl.hold({0: 20, 25: 10})                     # frame 0 plays 21 times, frame 25 11 times
+takes = tl.keep_ranges([(0, 30), (33, 40)])           # cut frames 30-32 out
+labelled = tl.keep_frame_by_label("start")            # single frame, by label
 ```
 
 A `Timeline` must keep at least one frame — slicing to empty raises `AssertionError`. Use
@@ -186,39 +217,55 @@ sprite.modify(GotoAndStop("stand"))                          # a label works too
 is one child, frame 1 another:
 
 ```python
-from prespyc.extractor.timeline.frame import Frame
-from prespyc.extractor.timeline.frame_object import FrameObject
-from prespyc.parser.structure.record.matrix import Matrix
-
 full = swf.extractor[202].modify(GotoAndStop(0))
 empty = swf.extractor[202].modify(GotoAndStop(30))
 
-bounds = full.bounds.union(empty.bounds)
-sequence = [full, empty, full]
-
-composed = Timeline(
-    bounds,
-    *(
-        Frame(bounds, {0: FrameObject(depth=0, object=d, bounds=d.bounds, matrix=Matrix())})
-        for d in sequence
-    ),
-)
+composed = Timeline.sequence(full, empty, full)       # one drawable per frame
 ```
 
-**Moving, tinting or swapping a placed object.** `FrameObject.with_()` replaces only what you pass:
+**Moving, tinting or swapping a placed object.** `FrameObject.matrix` is the PlaceObject matrix
+(`tag_matrix`) already translated by the object's own bounds offset. `with_placement()` redoes both
+and keeps the colour transform, mask, filters and blend mode; `with_()` replaces raw fields:
 
 ```python
+from prespyc.extractor.timeline.frame import Frame
+from prespyc.extractor.timeline.frame_object import FrameObject
 from prespyc.parser.structure.record.color_transform import ColorTransform
+from prespyc.parser.structure.record.matrix import Matrix
 
 frame = tl.frames[0]
 obj = frame.objects[3]                                   # by depth, or frame.object_by_name("head")
 
-moved = obj.with_(matrix=Matrix(translate_x=200, translate_y=-40))
-swapped = obj.with_(object=swf.extractor[119])
+moved = obj.with_placement(tag_matrix=Matrix(translate_x=200, translate_y=-40))
+swapped = obj.with_placement(swf.extractor[119])
 tinted = obj.with_(color_transform=ColorTransform(red_mult=128, green_mult=128, blue_mult=128))
+added = FrameObject.place(4, swf.extractor[119], Matrix(translate_x=200))
+nested = obj.with_placement(tag_matrix=obj.tag_matrix @ child_matrix)   # `@` applies the right one first
 
 patched = Frame(frame.bounds, {**frame.objects, 3: moved}, frame.actions, frame.label)
+```
 
+**Swapping a character wherever the tree places it**, keeping each placement:
+
+```python
+from prespyc.extractor.modifier.substitute import Substitute
+
+variant = sprite.modify(Substitute({119: swf.extractor[119].timeline.rotate(5)}))
+```
+
+**Drawing a shape from scratch**, e.g. a bitmap stretched over a diamond. Coordinates are absolute
+twips; `line(LineStyle(...))` and `curve_to()` work the same way:
+
+```python
+from prespyc.extractor.shape.shape_builder import ShapeBuilder
+from prespyc.parser.structure.record.shape.fill_style import FillStyle
+
+tile = (
+    ShapeBuilder(swf.extractor)
+    .fill(FillStyle(FillStyle.REPEATING_BITMAP, bitmap_id=62, bitmap_matrix=Matrix(20.0, 20.0)))
+    .move_to(-570, -1).line_to(-9, 288).line_to(552, -1).line_to(-9, -288).line_to(-570, -1)
+    .build(63)                                        # bounds from the edges, unless `bounds=`
+)
 ```
 
 **Recolouring a whole character**, recursively — cheaper and simpler than touching objects:
@@ -260,7 +307,7 @@ flag, build the sheet and set them before writing:
 ```python
 from prespyc.output.exporter import build_spritesheet
 
-sheet = build_spritesheet(composed, "7519", zoom=2)      # renders every frame
+sheet = build_spritesheet(composed, "7519", zoom=2)      # frames render when their page is packed
 n = len(sheet.frames)
 
 sheet.animations = {"0": list(range(n))}
@@ -270,9 +317,11 @@ sheet.write("out/", quality=90)
 ```
 
 `Spritesheet(name, frames, bounds, flash_frames, animations, zoom)` — `frames` is a list of
-`PIL.Image`, `bounds` is `(xmin, ymin, xmax, ymax)` in **output pixels** (twips / 20 * zoom) and
-drives the anchor. `pack(margin, max_size)` returns `Page(name, image, data)` objects if you want the
-images and JSON without writing them.
+`PIL.Image`, or `RenderedFrames(render, count)` to draw each frame only when its page is packed:
+memory stays bounded by a page, whatever the length. Rendered frames must share one size. `bounds` is
+`(xmin, ymin, xmax, ymax)` in **output pixels** (twips / 20 * zoom) and drives the anchor.
+`pack(margin, max_size)` returns `Page(name, image, data)` objects if you want the images and JSON
+without writing them; `pages()` yields them one at a time.
 
 ## Replacing ffdec
 
@@ -283,7 +332,7 @@ For a pipeline still reading ffdec's on-disk layout, the shim writes the same tr
 from prespyc.output.ffdec_compat import ZOOM, ffdec_export
 
 ffdec_export("sprite", "1047.swf", "out/", chids=[62])
-ffdec_export("sprite", "1047.swf", "out/", chids=[62], frame_idx=3, subframes=4)
+ffdec_export("sprite", "1047.swf", "out/", chids=[62], frame_idx=3, subframes=4)   # frame 4 stays, its clips play
 ```
 
 `export_type="script"` **raises `NotImplementedError`**: `prespyc` does not decompile ActionScript.
@@ -312,6 +361,7 @@ rasterizing and WEBP encoding dominate, and both are native.
 - **Confirm before overwriting an output tree.** `ffdec_export(..., clean_folder=True)` deletes
   `out_folder` recursively; it defaults to `True`, matching ffdec.
 - `Timeline(bounds)` with no frames raises `AssertionError`; keep at least one.
+- Dynamic text fields (`DefineEditText`) are not drawn: a sprite placing one gets a `MissingCharacter`.
 - `Opaque15Bit` lossless bitmaps and GIF-in-JPEG-tag payloads raise `NotImplementedError`, as in
   ArakneSwf. No fixture exercises either.
 - Rendered pixels are equivalent to, not identical with, ffdec's or ArakneSwf's: a different SVG

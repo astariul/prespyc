@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from prespyc.extractor.drawer.converter import Converter
 from prespyc.extractor.drawer.resizer import ScaleResizer
-from prespyc.output.spritesheet import MAX_ATLAS_SIZE, Spritesheet
+from prespyc.output.spritesheet import MAX_ATLAS_SIZE, RenderedFrames, Spritesheet
 
 if TYPE_CHECKING:
     from prespyc.extractor.drawable import Drawable
@@ -23,7 +23,7 @@ def build_spritesheet(
     subpixel_stroke_width: bool = True,
 ) -> Spritesheet:
     """
-    Render every frame of `drawable` and collect them into a `Spritesheet`.
+    A `Spritesheet` of every frame of `drawable`, each rendered when its page is packed.
 
     `recursive` counts the frames of the children too, which is what an animation needs: a sprite
     whose own timeline has one frame can still animate through a nested sprite.
@@ -35,9 +35,9 @@ def build_spritesheet(
     )
 
     frame_count = drawable.frames_count(recursive)
-    frames = [converter.to_image(drawable, frame) for frame in range(frame_count)]
+    frames = RenderedFrames(lambda frame: converter.to_image(drawable, frame), frame_count)
 
-    bounds = drawable.bounds
+    bounds = converter.canvas_bounds(drawable)
     scale = zoom / 20
 
     return Spritesheet(

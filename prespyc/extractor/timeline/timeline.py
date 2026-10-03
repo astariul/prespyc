@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 from prespyc.extractor.timeline.frame import Frame
@@ -10,7 +11,7 @@ from prespyc.parser.structure.record.matrix import Matrix
 from prespyc.parser.structure.record.rectangle import Rectangle
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator, Mapping
 
     from prespyc.extractor.drawable import Drawable
     from prespyc.extractor.drawer.drawer import Drawer
@@ -19,9 +20,14 @@ if TYPE_CHECKING:
 
 
 class Timeline:
-    """Movie timeline of a sprite or of a SWF file. Always holds at least one frame."""
+    """
+    Movie timeline of a sprite or of a SWF file. Always holds at least one frame.
 
-    __slots__ = ("bounds", "frames")
+    It plays like a movie clip: one frame per tick, back to the first one after the last unless a
+    script stops it, and each child playing from the frame placing it.
+    """
+
+    __slots__ = ("_filter_room", "_playback", "bounds", "frames")
 
     def __init__(self, bounds: Rectangle, *frames: Frame) -> None:
         assert len(frames) > 0
@@ -31,6 +37,9 @@ class Timeline:
 
         self.frames = frames
         """Frames of the timeline, in play order."""
+
+        self._playback: _Playback | None = None
+        self._filter_room: tuple[int, int] | None = None
 
     def frames_count(self, recursive: bool = False) -> int:
         count = len(self.frames)
@@ -46,11 +55,51 @@ class Timeline:
 
         return count
 
-    def draw(self, drawer: Drawer, frame: int = 0) -> Drawer:
-        frames = self.frames
-        current_frame = min(frame, len(frames) - 1)
+    @property
+    def filter_room(self) -> tuple[int, int]:
+        """
+        How far the filters of the tree draw beyond the bounds, in twips, on x and on y.
 
-        return frames[current_frame].draw(drawer, frame)
+        It is FFdec's reckoning: the widest spread of the filters of any placement, at any depth, in
+        whole pixels, whatever the matrices.
+        """
+        if self._filter_room is None:
+            room_x = room_y = 0
+            seen: set[int] = set()
+
+            for frame in self.frames:
+                for object in frame.objects.values():
+                    if id(object.object) not in seen:
+                        seen.add(id(object.object))
+                        timeline = Timeline.of(object.object)
+
+                        if timeline is not None:
+                            child_x, child_y = timeline.filter_room
+                            room_x, room_y = max(room_x, child_x), max(room_y, child_y)
+
+                    if object.filters:
+                        spreads = [filter.spread() for filter in object.filters]
+                        room_x = max(room_x, math.ceil(sum(x for x, _ in spreads)) * 20)
+                        room_y = max(room_y, math.ceil(sum(y for _, y in spreads)) * 20)
+
+            self._filter_room = (room_x, room_y)
+
+        return self._filter_room
+
+    @property
+    def loops(self) -> bool:
+        """Whether the timeline starts over after its last frame: none of its frame scripts stops it."""
+        return self._play().loops
+
+    def draw(self, drawer: Drawer, frame: int = 0) -> Drawer:
+        """
+        Draw the timeline as it is after playing `frame` frames.
+
+        Past the last frame, a looping timeline starts over and another one holds its last frame.
+        """
+        index, ticks = self._play().at(self.frames, frame)
+
+        return self.frames[index].draw(drawer, frame, ticks)
 
     def transform_colors(self, color_transform: ColorTransform) -> Timeline:
         frames = []
@@ -92,22 +141,8 @@ class Timeline:
         Equivalent to the "Attach Movie" action of SWF files. `name` is set on
         `FrameObject.name`.
         """
-        bounds = attachment.bounds
-        frames = [
-            frame.add_object(
-                FrameObject(
-                    depth=depth,
-                    object=attachment,
-                    bounds=bounds,
-                    matrix=Matrix(
-                        translate_x=bounds.xmin,
-                        translate_y=bounds.ymin,
-                    ),
-                    name=name,
-                )
-            )
-            for frame in self.frames
-        ]
+        object = FrameObject.place(depth, attachment, name=name)
+        frames = [frame.add_object(object) for frame in self.frames]
 
         return Timeline.create(*frames)
 
@@ -150,6 +185,38 @@ class Timeline:
             self.frames[number - 1],
         )
 
+    def pad_to(self, count: int) -> Timeline:
+        """Hold the last frame until the timeline is `count` frames long, and return a new timeline."""
+        missing = max(0, count - len(self.frames))
+
+        return Timeline(self.bounds, *self.frames, *([self.frames[-1]] * missing))
+
+    def repeat(self, times: int) -> Timeline:
+        """Play the frames `times` times in a row, and return a new timeline."""
+        return Timeline(self.bounds, *(self.frames * times))
+
+    def rotate(self, start: int) -> Timeline:
+        """
+        Start on the frame at position `start`, counting from 0, and play the frames before it last.
+
+        The loop stays the same, from another frame: several instances of a clip get out of sync.
+        """
+        return Timeline(self.bounds, *self.frames[start:], *self.frames[:start])
+
+    def hold(self, extra: Mapping[int, int]) -> Timeline:
+        """
+        Hold some frames longer and return a new timeline: the frame at position `i`, counting from
+        0, plays `1 + extra[i]` times.
+        """
+        return Timeline(
+            self.bounds,
+            *(frame for index, frame in enumerate(self.frames) for _ in range(1 + extra.get(index, 0))),
+        )
+
+    def keep_ranges(self, ranges: Iterable[tuple[int, int]]) -> Timeline:
+        """Play only the frames of the `[start, stop)` ranges, back to back, and return a new timeline."""
+        return Timeline(self.bounds, *(frame for start, stop in ranges for frame in self.frames[start:stop]))
+
     def with_bounds(self, new_bounds: Rectangle) -> Timeline:
         """Change the display bounds of the timeline and of its frames, and return a new timeline."""
         frames = []
@@ -168,10 +235,9 @@ class Timeline:
         """
         from prespyc.extractor.drawer.svg.svg_canvas import SvgCanvas
 
-        max_frame = len(self.frames) - 1
-        to_render = self.frames[min(frame, max_frame)]
+        index, _ = self._play().at(self.frames, frame)
 
-        return to_render.draw(SvgCanvas(to_render.bounds, subpixel_stroke_width), frame).render()
+        return self.draw(SvgCanvas(self.frames[index].bounds, subpixel_stroke_width), frame).render()
 
     def to_svg_all(self, subpixel_stroke_width: bool = True) -> Iterator[str]:
         """
@@ -183,10 +249,7 @@ class Timeline:
         from prespyc.extractor.drawer.svg.svg_canvas import SvgCanvas
 
         for f, frame in enumerate(self.frames):
-            drawer = SvgCanvas(frame.bounds, subpixel_stroke_width)
-            frame.draw(drawer, f)
-
-            yield drawer.render()
+            yield self.draw(SvgCanvas(frame.bounds, subpixel_stroke_width), f).render()
 
     @classmethod
     def empty(cls) -> Timeline:
@@ -197,12 +260,40 @@ class Timeline:
         """
         return Timeline(Rectangle(0, 0, 0, 0), Frame(Rectangle(0, 0, 0, 0), {}, [], None))
 
+    @staticmethod
+    def of(drawable: Drawable) -> Timeline | None:
+        """The timeline `drawable` plays: itself, that of a sprite, a button or a text, or `None`."""
+        if isinstance(drawable, Timeline):
+            return drawable
+
+        timeline = getattr(drawable, "timeline", None)
+
+        return timeline if isinstance(timeline, Timeline) else None
+
+    @classmethod
+    def sequence(cls, *drawables: Drawable, depth: int = 1, tag_matrix: Matrix | None = None) -> Timeline:
+        """
+        A timeline playing one drawable per frame, each placed at `depth` with `tag_matrix`.
+
+        That is how a clip whose frames are states (full, harvested, empty...) is rebuilt out of other
+        characters. The bounds hold every drawable.
+        """
+        objects = [FrameObject.place(depth, drawable, tag_matrix) for drawable in drawables]
+
+        return cls.create(*(Frame(object.bounds, {depth: object}) for object in objects))
+
     @classmethod
     def create(cls, *frames: Frame) -> Timeline:
         """A timeline holding `frames`, with the same bounds fixed on every frame."""
         bounds = Rectangle.merge([frame.bounds for frame in frames])
 
         return Timeline(bounds, *[frame.with_bounds(bounds) for frame in frames])
+
+    def _play(self) -> _Playback:
+        if self._playback is None:
+            self._playback = _Playback(self.frames)
+
+        return self._playback
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Timeline):
@@ -212,3 +303,70 @@ class Timeline:
 
     def __repr__(self) -> str:
         return f"Timeline(bounds={self.bounds!r}, frames={len(self.frames)})"
+
+
+class _Playback:
+    """How the frames of a timeline play, worked out once: when each placement starts, and stops."""
+
+    __slots__ = ("loops", "persistent", "starts", "stopped")
+
+    def __init__(self, frames: tuple[Frame, ...]) -> None:
+        from prespyc.avm.script import Script
+
+        self.loops = not any(Script(tag.actions).halts for frame in frames for tag in frame.actions)
+
+        self.starts: list[dict[int, int]] = []
+        """For each frame, by depth: the frame the placement of the object started on."""
+
+        self.stopped: set[int] = set()
+        """Placements whose own clip event handlers stop their object."""
+
+        current: dict[int, tuple[int, int]] = {}
+        seen: set[int] = set()
+
+        for index, frame in enumerate(frames):
+            starts = {}
+
+            for depth, object in frame.objects.items():
+                placement = current.get(depth)
+
+                if placement is None or placement[0] != object.placement:
+                    placement = current[depth] = (object.placement, index)
+
+                starts[depth] = placement[1]
+
+                if object.placement not in seen:
+                    seen.add(object.placement)
+
+                    if object.stops:
+                        self.stopped.add(object.placement)
+
+            for depth in [depth for depth in current if depth not in frame.objects]:
+                del current[depth]
+
+            self.starts.append(starts)
+
+        self.persistent = {depth for depth, start in self.starts[-1].items() if start == 0}
+        """Depths placed once for the whole timeline: starting over does not place them again."""
+
+    def at(self, frames: tuple[Frame, ...], frame: int) -> tuple[int, dict[int, int]]:
+        """The frame to draw after `frame` ticks, and how many frames each of its objects has played."""
+        count = len(frames)
+        looped = frame >= count and self.loops
+        index = frame % count if looped else min(frame, count - 1)
+        ticks = {}
+
+        for depth, object in frames[index].objects.items():
+            start = self.starts[index][depth]
+
+            if looped:
+                tick = frame if depth in self.persistent else index - start
+            else:
+                tick = frame - start
+
+            if object.placement in self.stopped:
+                tick = min(tick, object.object.frames_count() - 1)
+
+            ticks[depth] = tick
+
+        return index, ticks

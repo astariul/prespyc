@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from prespyc._util import decode_swf_text
@@ -10,9 +11,8 @@ from prespyc.errors import Errors, ProcessingInvalidDataError
 from prespyc.extractor.drawable import RatioDrawable
 from prespyc.extractor.timeline.blend_mode import BlendMode
 from prespyc.extractor.timeline.frame import Frame
-from prespyc.extractor.timeline.frame_object import FrameObject
+from prespyc.extractor.timeline.frame_object import FrameObject, new_placement
 from prespyc.extractor.timeline.timeline import Timeline
-from prespyc.parser.structure.record.matrix import Matrix
 from prespyc.parser.structure.record.rectangle import Rectangle
 from prespyc.parser.structure.tag.do_action import DoActionTag
 from prespyc.parser.structure.tag.end import EndTag
@@ -220,35 +220,22 @@ class TimelineProcessor:
         if ratio is not None and isinstance(object, RatioDrawable):
             object = object.with_ratio(ratio)
 
-        current_object_bounds = object.bounds
-
-        if tag.matrix is not None:
-            # Because the origin shape has already an offset, we need to apply the transformation
-            # to the offset, and apply the new matrix to the shape
-            new_matrix = tag.matrix.translate(current_object_bounds.xmin, current_object_bounds.ymin)
-            current_object_bounds = current_object_bounds.transform(tag.matrix)
-        else:
-            new_matrix = Matrix(
-                translate_x=current_object_bounds.xmin,
-                translate_y=current_object_bounds.ymin,
-            )
-
         filters = getattr(tag, "surface_filter_list", None)
 
         if filters is None:
             filters = []
 
-        return FrameObject(
+        return FrameObject.place(
             tag.depth,
             object,
-            current_object_bounds,
-            new_matrix,
-            tag.color_transform,
-            getattr(tag, "clip_depth", None),
-            self._decode(getattr(tag, "name", None)),
+            tag.matrix,
+            color_transform=tag.color_transform,
+            clip_depth=getattr(tag, "clip_depth", None),
+            name=self._decode(getattr(tag, "name", None)),
             filters=filters,
-            blend_mode=_blend_mode(getattr(tag, "blend_mode", None)),
+            blend_mode=BlendMode.of(getattr(tag, "blend_mode", None)),
             ratio=ratio,
+            clip_actions=getattr(tag, "clip_actions", None),
         )
 
     def _modify_object(
@@ -258,26 +245,14 @@ class TimelineProcessor:
     ) -> FrameObject:
         """Handle the movement, or the property changes, of an already displayed object."""
         if tag.character_id is not None:
-            # New object to display, so we need to modify the bounds and matrix according to the
-            # new object bounds
-            old_object_bounds = object_properties.object.bounds
-            new_object = self._extractor.character(tag.character_id)
-            matrix = tag.matrix
-            if matrix is None:
-                matrix = object_properties.matrix.translate(-old_object_bounds.xmin, -old_object_bounds.ymin)
-            new_object_bounds = new_object.bounds
-
-            object_properties = object_properties.with_(
-                object=new_object,
-                bounds=new_object_bounds.transform(matrix),
-                matrix=matrix.translate(new_object_bounds.xmin, new_object_bounds.ymin),
+            # A new object replaces the one at that depth: the bounds and matrix follow its bounds,
+            # and it plays from its first frame
+            object_properties = replace(
+                object_properties.with_placement(self._extractor.character(tag.character_id), tag.matrix),
+                placement=new_placement(),
             )
         elif tag.matrix is not None:
-            current_object_bounds = object_properties.object.bounds
-            object_properties = object_properties.with_(
-                bounds=current_object_bounds.transform(tag.matrix),
-                matrix=tag.matrix.translate(current_object_bounds.xmin, current_object_bounds.ymin),
-            )
+            object_properties = object_properties.with_placement(tag_matrix=tag.matrix)
 
         # PlaceObject3Tag properties
         blend_mode = getattr(tag, "blend_mode", None)
@@ -286,7 +261,7 @@ class TimelineProcessor:
         if blend_mode is not None or surface_filter_list is not None:
             object_properties = object_properties.with_(
                 filters=surface_filter_list,
-                blend_mode=_blend_mode(blend_mode) if blend_mode is not None else None,
+                blend_mode=BlendMode.of(blend_mode) if blend_mode is not None else None,
             )
 
         if tag.color_transform is not None or tag.clip_depth is not None or tag.name is not None:
@@ -298,20 +273,9 @@ class TimelineProcessor:
             )
 
         if tag.ratio is not None and isinstance(object_properties.object, RatioDrawable):
-            old_object_bounds = object_properties.object.bounds
-            matrix = tag.matrix
-            if matrix is None:
-                matrix = object_properties.matrix.translate(-old_object_bounds.xmin, -old_object_bounds.ymin)
-
-            new_object = object_properties.object.with_ratio(tag.ratio)
-            current_object_bounds = new_object.bounds
-
-            object_properties = object_properties.with_(
-                object=new_object,
-                bounds=current_object_bounds.transform(matrix),
-                matrix=matrix.translate(current_object_bounds.xmin, current_object_bounds.ymin),
-                ratio=tag.ratio,
-            )
+            object_properties = object_properties.with_placement(
+                object_properties.object.with_ratio(tag.ratio), tag.matrix
+            ).with_(ratio=tag.ratio)
 
         return object_properties
 
@@ -321,14 +285,6 @@ class TimelineProcessor:
             return None
 
         return decode_swf_text(raw, self._extractor.file.header.version)
-
-
-def _blend_mode(value: int | None) -> BlendMode:
-    """`BlendMode` for a raw blend mode value, defaulting to `NORMAL` for a missing or unknown one."""
-    try:
-        return BlendMode(value if value is not None else 1)
-    except ValueError:
-        return BlendMode.NORMAL
 
 
 def _parsed_tags(tags: Iterable[Any]) -> Iterator[Any]:
