@@ -39,6 +39,8 @@ Six facts that prevent most mistakes:
    frame still animates through a nested sprite. Always export `range(drawable.frames_count(True))`.
    A nested clip plays from the frame placing it, and loops unless a script, or a load handler of
    its placement, runs `stop()` or `gotoAndStop()`: then it holds its last frame (`timeline.loops`).
+   `frames_count(True)` reaches the longest animation at any depth; to play one frame for as long as
+   the clip it places, count that child's own `frames_count()`.
 3. **Everything returns a new instance.** `transform_colors()`, `modify()`, `with_*()`,
    `keep_frame_by_*()` never mutate. Rebind the result.
 4. **`bounds`, `timeline`, `shape`, `exported`, `shapes`, `sprites`, `images` are properties**, not
@@ -100,7 +102,7 @@ ex = swf.extractor
 ex.exported                  # {"anim0R": 62, "staticR": 66, ...} name -> character id
 ex.sprites                   # {id: SpriteDefinition}
 ex.shapes, ex.morph_shapes, ex.images
-ex.buttons, ex.texts          # a button draws its up state, a static text its font glyphs
+ex.buttons, ex.texts         # a button draws its up state, a static text its font glyphs
 ex["anim0R"]                 # by name
 ex[62]                       # by character id; a MissingCharacter if absent
 ex.timeline()                # the root timeline; timeline(False) to use frame bounds, not file bounds
@@ -152,8 +154,8 @@ Converter(FitSizeResizer(128, 128)).to_webp(sprite, frame=3, lossless=True)   # 
 An empty drawable (0x0 bounds) renders as a blank image, 1x1 unless the resizer asks for more.
 
 The canvas is `converter.canvas_bounds(drawable)`: the bounds, plus the room filters draw over on
-every side (FFdec's reckoning). Rendering a sprite one pinned frame at a time? Pass that same
-`bounds=` to every call, so the frames share one canvas and one anchor.
+every side (FFdec's reckoning). To render a sprite one pinned frame at a time, pass that same
+`bounds=` to every call: the frames then share one canvas and one anchor.
 
 `Converter(resizer=None, background_color=None, rasterizer=None, subpixel_stroke_width=True)`
 
