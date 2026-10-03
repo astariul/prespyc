@@ -54,9 +54,9 @@ class Converter:
         from prespyc.parser.structure.record.rectangle import Rectangle
 
         bounds = drawable.bounds
-        timeline = drawable if isinstance(drawable, Timeline) else getattr(drawable, "timeline", None)
+        timeline = Timeline.of(drawable)
 
-        if not isinstance(timeline, Timeline):
+        if timeline is None:
             return bounds
 
         room_x, room_y = timeline.filter_room

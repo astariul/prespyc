@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from prespyc.extractor.drawer.converter import Converter
 from prespyc.extractor.drawer.resizer import ScaleResizer
+from prespyc.extractor.timeline.timeline import Timeline
 from prespyc.swf_file import SwfFile
 
 if TYPE_CHECKING:
@@ -98,7 +99,7 @@ def _frames(drawable: Drawable, frame_idx: int | None, subframes: int | None) ->
     if not subframes or subframes <= 1:
         return [(drawable, frame_idx)]
 
-    timeline = getattr(drawable, "timeline", None)
+    timeline = Timeline.of(drawable)
 
     if timeline is None:
         return [(drawable, frame_idx)] * subframes

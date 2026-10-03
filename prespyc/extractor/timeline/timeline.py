@@ -71,13 +71,9 @@ class Timeline:
                 for object in frame.objects.values():
                     if id(object.object) not in seen:
                         seen.add(id(object.object))
-                        timeline = (
-                            object.object
-                            if isinstance(object.object, Timeline)
-                            else getattr(object.object, "timeline", None)
-                        )
+                        timeline = Timeline.of(object.object)
 
-                        if isinstance(timeline, Timeline):
+                        if timeline is not None:
                             child_x, child_y = timeline.filter_room
                             room_x, room_y = max(room_x, child_x), max(room_y, child_y)
 
@@ -263,6 +259,16 @@ class Timeline:
         Used as the fallback value when an error occurs while parsing a timeline.
         """
         return Timeline(Rectangle(0, 0, 0, 0), Frame(Rectangle(0, 0, 0, 0), {}, [], None))
+
+    @staticmethod
+    def of(drawable: Drawable) -> Timeline | None:
+        """The timeline `drawable` plays: itself, that of a sprite, a button or a text, or `None`."""
+        if isinstance(drawable, Timeline):
+            return drawable
+
+        timeline = getattr(drawable, "timeline", None)
+
+        return timeline if isinstance(timeline, Timeline) else None
 
     @classmethod
     def sequence(cls, *drawables: Drawable, depth: int = 1, tag_matrix: Matrix | None = None) -> Timeline:
