@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.2.0] - 04/10/2026
+
 * ⭐ `prespyc.to_python()`: script values as plain dicts and lists
 * ⭐ `Script`: what an action block does, read off its bytecode
 * ⭐ `FrameObject.clip_actions`: the `onClipEvent()` handlers of a placement
@@ -21,6 +23,6 @@
 * 🪲 `subpixel_stroke_width=False` floors strokes at one output pixel, through the zoom and the placements, instead of relying on the `vector-effect` resvg ignores
 
 
-## [v0.1.0] - 09/09/2026s
+## [v0.1.0] - 09/09/2026
 
 * ⭐ Initial release
